@@ -1,0 +1,25 @@
+# TTS Микросервис - зависимости
+# Минимальный набор зависимостей для TTS сервиса (Silero TTS)
+
+# TTS и аудио
+torch>=2.0.0
+torchaudio>=2.0.0
+soundfile>=0.12.1
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Конфигурация для Silero TTS
+omegaconf>=2.3.0
+
+# Flask и веб-фреймворк
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# Утилиты
+python-dotenv>=1.0.0
+
+# HTTP и API
+requests>=2.31.0
+
+# Валидация и сериализация
+pydantic>=2.5.0

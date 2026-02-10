@@ -1,0 +1,154 @@
+# Voice Talker - Docker Compose
+# Голосовой помощник с потоковым ASR, TTS и локальной LLM
+
+#
+# Использование:
+#   docker-compose up -d          - запуск в фоне
+#   docker-compose up --build     - пересборка и запуск
+#   docker-compose logs -f        - просмотр логов
+#   docker-compose down           - остановка
+
+services:
+  # ==================== TTS Микросервис (Silero TTS) ====================
+  tts-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.tts
+    container_name: voice-talker-tts
+    restart: unless-stopped
+    
+    ports:
+      - "5002:5002"
+    
+    volumes:
+      # Кэш моделей PyTorch (чтобы не скачивать каждый раз)
+      - tts-cache:/home/app/.cache/torch
+      # Локальные модели Silero TTS (монтируем готовые модели, если есть)
+      # Модели автоматически скачиваются при первом запуске, если не найдены локально
+      - ./models:/app/models:ro
+    
+    environment:
+      - TTS_HOST=0.0.0.0
+      - TTS_PORT=5002
+      - TTS_DEBUG=False
+      # Выбор модели: v3_1_ru, v5_ru (рекомендуется), v5_cis
+      # v5_ru - лучший выбор: автоударения, быстрая, качественная
+      - TTS_MODEL=v5_ru
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s  # TTS модель загружается долго
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== Основной сервис Voice Talker ====================
+  voice-talker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voice-talker
+    restart: unless-stopped
+    depends_on:
+      - tts-service
+    
+    ports:
+      - "8300:8300"
+    
+    volumes:
+      # Конфигурация (можно редактировать без пересборки)
+      - ./data:/app/data
+      # Модели ASR (большие файлы, монтируем для ускорения сборки)
+      - ./models:/app/models:ro
+      # Модели T-one ASR (model.onnx ~137MB, kenlm.bin ~5.1GB)
+      - ./models/t-one:/app/asr-models:ro
+      # Исходный код (для разработки, раскомментировать при необходимости)
+      # - ./src:/app/src
+    
+    environment:
+      # LLM настройки
+      # Примечание: host.docker.internal работает на Windows/Mac
+      # Для Linux используйте IP хоста или --network host
+      - LLM_BASE_URL=http://host.docker.internal:1234/v1
+      - LLM_MODEL=google/gemma-3-4b
+      - LLM_MAX_TOKENS=2048
+      - LLM_TEMPERATURE=0.7
+      
+      # ASR настройки
+      # Модели T-one загружаются из локальной папки (не из HuggingFace)
+      - ASR_MODEL_PATH=/app/asr-models
+      - ASR_SAMPLE_RATE=8000
+      
+      # TTS настройки (Silero TTS микросервис внутри docker-compose)
+      - TTS_MICROSERVICE_URL=http://tts-service:5002
+      
+      # Сервер
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8300
+      
+      # Python
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    
+    # Для Linux: доступ к LLM на хосте
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8300/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s  # ASR модель загружается долго
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== Разработка (опционально) ====================
+  voice-talker-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voice-talker-dev
+    profiles:
+      - dev
+    depends_on:
+      - tts-service
+    
+    ports:
+      - "8301:8300"
+    
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models:ro
+      - ./src:/app/src  # Hot-reload исходного кода
+    
+    environment:
+      - LLM_BASE_URL=http://host.docker.internal:1234/v1
+      - LLM_MODEL=google/gemma-3-4b
+      - TTS_MICROSERVICE_URL=http://tts-service:5002
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8300
+      - PYTHONUNBUFFERED=1
+    
+    command: ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8300", "--reload"]
+
+# ==================== Volumes ====================
+volumes:
+  tts-cache:
+    name: voice-talker-tts-cache
+
+networks:
+  default:
+    name: voice-talker-network

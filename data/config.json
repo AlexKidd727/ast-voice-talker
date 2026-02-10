@@ -1,0 +1,33 @@
+{
+    "llm": {
+        "api_key": "not-needed",
+        "model_name": "google/gemma-3-4b",
+        "base_url": "http://192.168.1.250:1234/v1",
+        "max_tokens": 1024,
+        "temperature": 0.7
+    },
+    "asr": {
+        "model_path": null,
+        "sample_rate": 8000,
+        "enable_text_api": false,
+        "text_api_url": "http://localhost:8586/api/text"
+    },
+    "server": {
+        "host": "0.0.0.0",
+        "port": 8300
+    },
+    "tts": {
+        "url": "http://tts-service:5002",
+        "speaker": "kseniya"
+    },
+    "phone": {
+        "enabled": true,
+        "greeting": "Здравствуйте! Я голосовой помощник. Чем могу помочь?",
+        "silence_timeout": 30,
+        "speaker": "kseniya",
+        "whitelist": [],
+        "blacklist": [],
+        "auto_hangup_after_goodbye": true,
+        "max_call_duration": 300
+    }
+}

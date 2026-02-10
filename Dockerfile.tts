@@ -1,0 +1,76 @@
+# Dockerfile для TTS микросервиса (Silero TTS)
+# Voice Talker - синтез речи
+FROM python:3.11-slim
+
+# Устанавливаем системные зависимости для аудио и TTS
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    pkg-config \
+    wget \
+    git \
+    build-essential \
+    # Аудио зависимости
+    libsndfile1 \
+    libsndfile1-dev \
+    libasound2-dev \
+    portaudio19-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем requirements для TTS
+COPY requirements.tts-microservice.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.tts-microservice.txt
+
+# Проверяем установку критических модулей
+RUN python -c "import torch; print('PyTorch version:', torch.__version__)"
+RUN python -c "import soundfile; print('SoundFile version:', soundfile.__version__)"
+RUN python -c "import numpy; print('NumPy version:', numpy.__version__)"
+RUN python -c "import scipy; print('SciPy version:', scipy.__version__)"
+RUN python -c "import omegaconf; print('OmegaConf version:', omegaconf.__version__)"
+RUN python -c "import flask; print('Flask version:', flask.__version__)"
+
+# Примечание: модель Silero TTS загружается при первом запуске сервиса
+# Предзагрузка в образ невозможна из-за Git LFS и размера файлов
+# Модель кэшируется в volume tts-cache для повторных запусков
+
+# Копируем код TTS микросервиса и скрипт проверки
+COPY tts_microservice.py .
+COPY check_tts_modules.py .
+
+# Создаем пользователя для безопасности
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app \
+    && mkdir -p /app/logs \
+    && mkdir -p /home/app/.cache/torch \
+    && chown -R app:app /app/logs \
+    && chown -R app:app /home/app/.cache \
+    && cp -r /root/.cache/torch/hub/* /home/app/.cache/torch/hub/ 2>/dev/null || true \
+    && chown -R app:app /home/app/.cache/torch
+
+USER app
+
+# Устанавливаем переменные окружения
+ENV FLASK_APP=tts_microservice.py
+ENV FLASK_ENV=production
+ENV PYTHONPATH=/app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV TORCH_HOME=/home/app/.cache/torch
+ENV TTS_HOST=0.0.0.0
+ENV TTS_PORT=5002
+ENV TTS_DEBUG=False
+
+# Открываем порт
+EXPOSE 5002
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5002/health')" || exit 1
+
+# Команда запуска с проверкой модулей
+CMD ["sh", "-c", "python check_tts_modules.py && python tts_microservice.py"]

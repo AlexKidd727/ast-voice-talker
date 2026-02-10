@@ -1,0 +1,3137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AST-VoiceTalker - Голосовой AI помощник</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- MathJax для отображения математических формул -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)']],
+                displayMath: [['\\[', '\\]']]
+            }
+        };
+    </script>
+    <style>
+        /* Цветовая палитра - светлая тема (как в video-hosting) */
+        :root {
+            --color-blue: #4a6fa5;
+            --color-light-blue: #7ba3d0;
+            --color-orange: #d4a574;
+            --color-dark-orange: #b8915f;
+            --color-brown: #8b7355;
+            --color-light-brown: #d4c4b0;
+            --color-dark-brown: #6b5d47;
+            --color-black: #2c2c2c;
+            --color-white: #ffffff;
+            --color-gray: #e8e4df;
+            --color-dark-gray: #5a5a5a;
+            
+            /* Фоновые цвета */
+            --bg-primary: linear-gradient(135deg, #f5f1eb 0%, #ebe6df 100%);
+            --bg-card: var(--color-white);
+            --bg-input: var(--color-white);
+            --bg-input-focus: #fafafa;
+            
+            /* Текстовые цвета */
+            --text-primary: var(--color-black);
+            --text-secondary: var(--color-dark-gray);
+            
+            /* Границы */
+            --border-color: var(--color-light-brown);
+            --border-color-hover: var(--color-light-blue);
+            
+            /* Чат */
+            --chat-bg: var(--color-white);
+            --chat-header-bg: rgba(74, 111, 165, 0.05);
+            --message-user-bg: linear-gradient(135deg, var(--color-blue) 0%, var(--color-light-blue) 100%);
+            --message-assistant-bg: #f5f1eb;
+            --message-assistant-border: var(--color-light-brown);
+        }
+        
+        /* Цветовая палитра - темная тема */
+        [data-theme="dark"] {
+            --color-blue: #6b9dd9;
+            --color-light-blue: #8fb8e8;
+            --color-orange: #e8b88a;
+            --color-dark-orange: #d4a574;
+            --color-brown: #a6896b;
+            --color-light-brown: #8b7a6a;
+            --color-dark-brown: #7a6b5a;
+            --color-black: #e0e0e0;
+            --color-white: #2d3a4a;
+            --color-gray: #3a4a5a;
+            --color-dark-gray: #b0b0b0;
+            
+            /* Фоновые цвета - серо-голубые оттенки */
+            --bg-primary: linear-gradient(135deg, #2d3a4a 0%, #3a4a5a 100%);
+            --bg-card: #3a4a5a;
+            --bg-input: #3a4a5a;
+            --bg-input-focus: #4a5a6a;
+            
+            /* Текстовые цвета */
+            --text-primary: var(--color-black);
+            --text-secondary: var(--color-dark-gray);
+            
+            /* Границы */
+            --border-color: var(--color-light-brown);
+            --border-color-hover: var(--color-light-blue);
+            
+            /* Чат */
+            --chat-bg: #3a4a5a;
+            --chat-header-bg: rgba(107, 157, 217, 0.15);
+            --message-user-bg: linear-gradient(135deg, var(--color-blue) 0%, var(--color-light-blue) 100%);
+            --message-assistant-bg: #4a5a6a;
+            --message-assistant-border: var(--color-light-brown);
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        
+        body {
+            background: var(--bg-primary);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--color-blue) 0%, var(--color-light-blue) 100%);
+            color: #ffffff;
+            padding: 1rem 0;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border-bottom: 2px solid var(--border-color);
+            flex-shrink: 0;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        [data-theme="dark"] header {
+            color: #1a1a2e;
+        }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--color-blue) 0%, var(--color-light-blue) 100%);
+            border: none;
+            color: #ffffff !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary-custom:hover {
+            background: linear-gradient(135deg, var(--color-light-blue) 0%, var(--color-blue) 100%);
+            box-shadow: 0 4px 8px rgba(74, 111, 165, 0.3);
+            transform: translateY(-1px);
+            color: #ffffff !important;
+        }
+        
+        [data-theme="dark"] .btn-primary-custom {
+            color: var(--color-black) !important;
+            text-shadow: none;
+        }
+        
+        /* Переключатель темы */
+        .theme-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #ffffff;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+        }
+        
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        
+        .theme-toggle svg {
+            width: 22px;
+            height: 22px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        
+        [data-theme="dark"] .theme-toggle {
+            background: rgba(0, 0, 0, 0.2);
+            border-color: rgba(0, 0, 0, 0.3);
+            color: #1a1a2e;
+        }
+        
+        [data-theme="dark"] .theme-toggle:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 1rem;
+        }
+        
+        .tab-content-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .tab-pane {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .tab-pane.show.active {
+            display: flex;
+        }
+        
+        /* ========== Чат (основной режим) ========== */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--chat-bg);
+            border-radius: 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .chat-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--chat-header-bg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background: var(--chat-bg);
+            transition: background 0.3s ease;
+        }
+        
+        .message {
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            margin-bottom: 0.75rem;
+            max-width: 75%;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: none; }
+        }
+        
+        .message-user {
+            background: var(--message-user-bg);
+            color: #ffffff;
+            margin-left: auto;
+            box-shadow: 0 2px 8px rgba(74, 111, 165, 0.25);
+        }
+        
+        [data-theme="dark"] .message-user {
+            color: var(--color-black);
+        }
+        
+        .message-assistant {
+            background: var(--message-assistant-bg);
+            border: 1px solid var(--message-assistant-border);
+            margin-right: auto;
+            color: var(--text-primary);
+            transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+        
+        /* Примечание: стили для индикатора потоковой генерации */
+        .streaming-indicator {
+            color: var(--color-blue);
+            font-style: italic;
+            opacity: 0.7;
+        }
+        
+        .streaming-indicator::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        /* Блоки кода в сообщениях */
+        .message pre {
+            background: var(--color-brown);
+            color: #f5f5f5;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            white-space: pre;
+            border: 1px solid var(--color-dark-brown);
+        }
+        
+        [data-theme="dark"] .message pre {
+            background: #4a5a6a;
+            border-color: var(--color-light-brown);
+        }
+        
+        .message pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+            font-family: inherit;
+        }
+        
+        .message code {
+            background: rgba(139, 115, 85, 0.15);
+            padding: 0.15rem 0.4rem;
+            border-radius: 0.25rem;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875em;
+            color: var(--color-brown);
+        }
+        
+        [data-theme="dark"] .message code {
+            background: rgba(166, 137, 107, 0.25);
+            color: var(--color-orange);
+        }
+        
+        .message-user code {
+            background: rgba(255, 255, 255, 0.2);
+            color: inherit;
+        }
+        
+        /* Заголовки Markdown в сообщениях */
+        .message .md-heading {
+            margin: 0.75rem 0 0.5rem 0;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        
+        .message h3.md-heading {
+            font-size: 1.25rem;
+            color: var(--color-blue);
+        }
+        
+        .message h4.md-heading {
+            font-size: 1.1rem;
+            color: var(--color-blue);
+        }
+        
+        .message h5.md-heading {
+            font-size: 1rem;
+            color: var(--color-blue);
+        }
+        
+        .message h6.md-heading {
+            font-size: 0.9rem;
+            color: var(--color-blue);
+        }
+        
+        .message-user .md-heading {
+            color: rgba(255, 255, 255, 0.95);
+        }
+        
+        [data-theme="dark"] .message-user .md-heading {
+            color: var(--color-black);
+        }
+        
+        /* Списки Markdown */
+        .message .md-list-item {
+            display: block;
+            padding-left: 1.2rem;
+            position: relative;
+            margin: 0.25rem 0;
+        }
+        
+        .message .md-list-item::before {
+            content: "\2022";
+            position: absolute;
+            left: 0;
+            color: var(--color-blue);
+            font-weight: bold;
+        }
+        
+        .message-user .md-list-item::before {
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        [data-theme="dark"] .message-user .md-list-item::before {
+            color: var(--color-black);
+        }
+        
+        .message .md-list {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        .message .md-list li {
+            margin: 0.25rem 0;
+            list-style: none;
+        }
+        
+        .message .md-list ol,
+        .message .md-list ul {
+            margin: 0.25rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        .message .md-quote {
+            border-left: 3px solid var(--color-blue);
+            padding-left: 1rem;
+            margin: 0.5rem 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        
+        .message-user .md-quote {
+            border-left-color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .message .math-inline {
+            display: inline-block;
+            margin: 0 0.2em;
+            vertical-align: middle;
+        }
+        
+        .message .math-block {
+            display: block;
+            margin: 1rem 0;
+            text-align: center;
+            overflow-x: auto;
+        }
+        
+        /* Горизонтальная линия Markdown */
+        .message .md-hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 0.75rem 0;
+        }
+        
+        .message-user .md-hr {
+            border-top-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        /* Таблицы в сообщениях */
+        .message .table {
+            width: 100%;
+            margin: 0.75rem 0;
+            font-size: 0.9em;
+            border-collapse: collapse;
+        }
+        
+        .message .table thead {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        [data-theme="dark"] .message .table thead {
+            background: rgba(59, 130, 246, 0.2);
+        }
+        
+        .message .table th {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--color-blue);
+            color: var(--color-blue);
+        }
+        
+        .message .table td {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .message .table tbody tr:hover {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        [data-theme="dark"] .message .table tbody tr:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .message-user .table thead {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .message-user .table th {
+            color: rgba(255, 255, 255, 0.95);
+            border-bottom-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .message-user .table td {
+            border-bottom-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .message-user .table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Блоки размышлений <think> */
+        .think-block {
+            background: rgba(212, 165, 116, 0.2);
+            border: 1px solid var(--color-orange);
+            border-radius: 0.5rem;
+            margin: 0.5rem 0;
+            font-size: 0.9em;
+        }
+        
+        [data-theme="dark"] .think-block {
+            background: rgba(232, 184, 138, 0.15);
+        }
+        
+        .think-block summary {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--color-brown);
+            user-select: none;
+        }
+        
+        [data-theme="dark"] .think-block summary {
+            color: var(--color-orange);
+        }
+        
+        .think-block summary:hover {
+            background: rgba(212, 165, 116, 0.3);
+        }
+        
+        .think-content {
+            padding: 0.75rem;
+            border-top: 1px solid var(--color-orange);
+            color: var(--color-dark-brown);
+            line-height: 1.5;
+        }
+        
+        [data-theme="dark"] .think-content {
+            color: var(--color-orange);
+        }
+        
+        .message-user .think-block {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .message-user .think-block summary {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .message-user .think-content {
+            color: rgba(255, 255, 255, 0.9);
+            border-top-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .chat-input-area {
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-card);
+            flex-shrink: 0;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .voice-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .voice-select-group {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-left: auto;
+        }
+        
+        .voice-select-group .form-check {
+            margin-bottom: 0;
+        }
+        
+        .recording-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #ef4444;
+            font-weight: 500;
+        }
+        
+        .recording-dot {
+            width: 10px;
+            height: 10px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .timer {
+            font-family: 'Consolas', monospace;
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+        
+        /* ========== Панель ролей ========== */
+        .role-panel {
+            background: var(--chat-header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            flex-shrink: 0;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .role-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            max-width: 800px;
+        }
+        
+        .role-selector select {
+            min-width: 200px;
+            max-width: 250px;
+        }
+        
+        .role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            background: linear-gradient(135deg, var(--color-blue) 0%, var(--color-light-blue) 100%);
+            color: #ffffff;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        [data-theme="dark"] .role-badge {
+            color: #1a1a2e;
+        }
+        
+        /* ========== Транскрипция ========== */
+        .transcription-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow: hidden;
+        }
+        
+        .transcription-controls {
+            background: var(--bg-card);
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+        
+        .transcription-results {
+            flex: 1;
+            background: var(--bg-card);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .transcription-results-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--chat-header-bg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .transcription-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background: var(--bg-card);
+            transition: background 0.3s ease;
+        }
+        
+        #transcriptList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        #transcriptList li {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        #transcriptList li:last-child {
+            border-bottom: none;
+        }
+        
+        #waveform {
+            width: 100%;
+            height: 60px;
+            background: var(--color-gray);
+            border-radius: 0.5rem;
+            transition: background 0.3s ease;
+        }
+        
+        /* ========== Статусы ========== */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+        }
+        
+        /* Примечание: цвета поменяны местами между светлой и темной темой для лучшего контраста */
+        .status-connected {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        
+        .status-disconnected {
+            background: rgba(248, 113, 113, 0.2);
+            color: #f87171;
+        }
+        
+        [data-theme="dark"] .status-connected {
+            background: rgba(22, 163, 74, 0.15);
+            color: #166534;
+        }
+        
+        [data-theme="dark"] .status-disconnected {
+            background: rgba(220, 38, 38, 0.15);
+            color: #dc2626;
+        }
+        
+        /* ========== Навигация ========== */
+        .main-tabs {
+            margin-bottom: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .main-tabs .nav-link {
+            font-weight: 500;
+            color: var(--text-secondary);
+            border: none;
+            border-bottom: 3px solid transparent;
+            border-radius: 0;
+            padding: 0.75rem 1.5rem;
+            transition: color 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .main-tabs .nav-link.active {
+            color: var(--color-blue);
+            border-bottom-color: var(--color-blue);
+            background: transparent;
+        }
+        
+        .main-tabs .nav-link:hover:not(.active) {
+            color: var(--text-primary);
+            border-bottom-color: var(--border-color);
+        }
+        
+        /* ========== Информационная панель ========== */
+        .info-panel {
+            background: var(--bg-card);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-top: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            flex-shrink: 0;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .info-panel .info-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-right: 1.5rem;
+            font-size: 0.875rem;
+        }
+        
+        .info-panel .info-label {
+            color: var(--text-secondary);
+        }
+        
+        .info-panel .info-value {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        /* ========== Пустые состояния ========== */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        /* ========== Формы и селекты для темной темы ========== */
+        .form-control, .form-select {
+            background-color: var(--bg-input);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background-color: var(--bg-input-focus);
+            color: var(--text-primary);
+            border-color: var(--border-color-hover);
+            box-shadow: 0 0 0 3px rgba(123, 163, 208, 0.15);
+        }
+        
+        [data-theme="dark"] .form-control,
+        [data-theme="dark"] .form-select {
+            background-color: var(--bg-input);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+        
+        [data-theme="dark"] .form-control:focus,
+        [data-theme="dark"] .form-select:focus {
+            background-color: var(--bg-input-focus);
+            box-shadow: 0 0 0 3px rgba(143, 184, 232, 0.2);
+        }
+        
+        /* ========== Модальные окна ========== */
+        .modal-content {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .modal-header {
+            border-bottom-color: var(--border-color);
+            background: var(--chat-header-bg);
+        }
+        
+        .modal-footer {
+            border-top-color: var(--border-color);
+        }
+        
+        .modal-title {
+            color: var(--color-blue);
+        }
+        
+        [data-theme="dark"] .btn-close {
+            filter: invert(1) grayscale(100%) brightness(200%);
+        }
+        
+        /* ========== Таблицы ========== */
+        .table {
+            color: var(--text-primary);
+        }
+        
+        .table thead th {
+            background: var(--chat-header-bg);
+            color: var(--color-blue);
+            border-bottom-color: var(--border-color);
+        }
+        
+        .table td, .table th {
+            border-color: var(--border-color);
+        }
+        
+        .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: rgba(74, 111, 165, 0.05);
+        }
+        
+        [data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: rgba(107, 157, 217, 0.1);
+        }
+        
+        /* ========== Навигационные табы ========== */
+        .nav-tabs .nav-link {
+            color: var(--text-secondary);
+            border-color: transparent;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            color: var(--color-blue);
+            border-color: var(--border-color);
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: var(--color-blue);
+            background-color: var(--bg-card);
+            border-color: var(--border-color) var(--border-color) var(--bg-card);
+        }
+        
+        .nav-pills .nav-link {
+            color: var(--text-secondary);
+        }
+        
+        .nav-pills .nav-link:hover {
+            color: var(--color-blue);
+        }
+        
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, var(--color-blue) 0%, var(--color-light-blue) 100%);
+            color: #ffffff;
+        }
+        
+        [data-theme="dark"] .nav-pills .nav-link.active {
+            color: #1a1a2e;
+        }
+        
+        .modal-body .table {
+            margin-bottom: 0;
+        }
+        
+        .modal-body .table td {
+            vertical-align: middle;
+        }
+        
+        .prompt-preview {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            max-width: 400px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .btn-action {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        /* ========== Кнопки Bootstrap в темной теме ========== */
+        [data-theme="dark"] .btn-outline-secondary {
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+        
+        [data-theme="dark"] .btn-outline-secondary:hover {
+            background-color: var(--color-gray);
+            border-color: var(--border-color-hover);
+            color: var(--text-primary);
+        }
+        
+        [data-theme="dark"] .btn-outline-danger {
+            color: #f87171;
+            border-color: #f87171;
+        }
+        
+        [data-theme="dark"] .btn-outline-danger:hover {
+            background-color: rgba(248, 113, 113, 0.2);
+            border-color: #f87171;
+            color: #f87171;
+        }
+        
+        [data-theme="dark"] .btn-outline-primary {
+            color: var(--color-light-blue);
+            border-color: var(--color-light-blue);
+        }
+        
+        [data-theme="dark"] .btn-outline-primary:hover {
+            background-color: var(--color-blue);
+            border-color: var(--color-blue);
+            color: #1a1a2e;
+        }
+        
+        [data-theme="dark"] .btn-secondary {
+            background-color: var(--color-gray);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        [data-theme="dark"] .btn-secondary:hover {
+            background-color: var(--bg-input-focus);
+            border-color: var(--border-color-hover);
+        }
+        
+        [data-theme="dark"] .btn-danger {
+            background-color: #dc2626;
+            border-color: #dc2626;
+            color: #ffffff;
+        }
+        
+        /* ========== Текст и ссылки ========== */
+        [data-theme="dark"] .text-muted {
+            color: var(--text-secondary) !important;
+        }
+        
+        [data-theme="dark"] .text-success {
+            color: #4ade80 !important;
+        }
+        
+        [data-theme="dark"] .text-danger {
+            color: #f87171 !important;
+        }
+        
+        [data-theme="dark"] .fw-semibold {
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container-fluid px-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h4 mb-0"><i class="bi bi-mic-fill me-2"></i>AST-VoiceTalker</h1>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span id="asrStatus" class="status-indicator status-disconnected">
+                        <i class="bi bi-circle-fill"></i> ASR
+                    </span>
+                    <span id="llmStatus" class="status-indicator status-disconnected">
+                        <i class="bi bi-circle-fill"></i> LLM
+                    </span>
+                    <span id="ttsStatus" class="status-indicator status-disconnected">
+                        <i class="bi bi-circle-fill"></i> TTS
+                    </span>
+                    <button id="themeToggle" class="theme-toggle" title="Переключить тему">
+                        <svg class="theme-icon-light" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="theme-icon-dark" style="display: none;" viewBox="0 0 24 24">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Главные вкладки -->
+        <ul class="nav main-tabs" id="mainTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chatPane" type="button">
+                    <i class="bi bi-chat-dots me-2"></i>Чат с AI
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="transcription-tab" data-bs-toggle="tab" data-bs-target="#transcriptionPane" type="button">
+                    <i class="bi bi-soundwave me-2"></i>Транскрипция
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content tab-content-wrapper" id="mainTabContent">
+            <!-- ==================== Вкладка: Чат с AI ==================== -->
+            <div class="tab-pane fade show active" id="chatPane" role="tabpanel">
+                <div class="chat-container">
+                    <!-- Панель выбора роли и голоса -->
+                    <div class="role-panel">
+                        <div class="role-selector">
+                            <label class="form-label mb-0 fw-semibold"><i class="bi bi-person-badge me-1"></i>Роль:</label>
+                            <select id="roleSelect" class="form-select form-select-sm">
+                                <!-- Роли будут добавлены из JavaScript -->
+                            </select>
+                            <button id="editRolesBtn" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#rolesModal">
+                                <i class="bi bi-gear"></i>
+                            </button>
+                            
+                            <span class="ms-3"></span>
+                            
+                            <label class="form-label mb-0 fw-semibold"><i class="bi bi-mic me-1"></i>Голос:</label>
+                            <select id="voiceSelect" class="form-select form-select-sm">
+                                <!-- Голоса будут загружены динамически из API -->
+                                <option value="kseniya">Маша (жен.)</option>
+                                <option value="xenia">Женя (жен.)</option>
+                                <option value="baya">Юля (жен.)</option>
+                                <option value="aidar">Дима (муж.)</option>
+                            </select>
+                            
+                            <span id="currentRoleBadge" class="role-badge ms-2">
+                                <i class="bi bi-robot"></i>
+                                <span id="currentRoleName">Универсальный помощник</span>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-header">
+                        <span class="fw-semibold"><i class="bi bi-robot me-2"></i>Голосовой помощник</span>
+                        <div>
+                            <button id="clearChatBtn" class="btn btn-sm btn-outline-danger" title="Очистить чат">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="empty-state" id="emptyChatState">
+                            <i class="bi bi-chat-square-text"></i>
+                            <p>Нажмите "Начать разговор" и задайте любой вопрос голосом,<br>или напишите сообщение в поле ниже</p>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <div class="voice-controls">
+                            <button id="startChatBtn" class="btn btn-primary-custom">
+                                <i class="bi bi-mic me-1"></i>Начать разговор
+                            </button>
+                            <button id="stopChatBtn" class="btn btn-outline-danger" style="display: none;">
+                                <i class="bi bi-stop-circle me-1"></i>Остановить
+                            </button>
+                            <button id="stopGenerationBtn" class="btn btn-outline-warning" style="display: none;">
+                                <i class="bi bi-x-circle me-1"></i>Стоп
+                            </button>
+                            <span id="chatRecordingIndicator" class="recording-indicator" style="display: none;">
+                                <span class="recording-dot"></span>
+                                <span id="chatTimerDisplay" class="timer">00:00</span>
+                            </span>
+                        </div>
+                        
+                        <div class="input-group">
+                            <input type="text" id="chatInput" class="form-control" placeholder="Или напишите сообщение...">
+                            <button id="sendChatBtn" class="btn btn-primary-custom">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ==================== Вкладка: Транскрипция ==================== -->
+            <div class="tab-pane fade" id="transcriptionPane" role="tabpanel">
+                <div class="transcription-container">
+                    <div class="transcription-controls">
+                        <!-- Переключатель: Микрофон / Файл -->
+                        <ul class="nav nav-pills mb-3" id="inputModeTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="mic-mode-tab" data-bs-toggle="pill" data-bs-target="#micModePane" type="button">
+                                    <i class="bi bi-mic me-1"></i>Микрофон
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="file-mode-tab" data-bs-toggle="pill" data-bs-target="#fileModePane" type="button">
+                                    <i class="bi bi-file-earmark-music me-1"></i>Загрузить файл
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content">
+                            <!-- Режим: Микрофон -->
+                            <div class="tab-pane fade show active" id="micModePane">
+                                <canvas id="waveform"></canvas>
+                                <div class="d-flex gap-2 mt-3 align-items-center">
+                                    <button id="startRecBtn" class="btn btn-primary-custom">
+                                        <i class="bi bi-record-circle me-1"></i>Начать запись
+                                    </button>
+                                    <button id="stopRecBtn" class="btn btn-outline-danger" disabled>
+                                        <i class="bi bi-stop-circle me-1"></i>Остановить
+                                    </button>
+                                    <span id="transcriptTimerDisplay" class="timer ms-2" style="display: none;">00:00:00</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Режим: Файл -->
+                            <div class="tab-pane fade" id="fileModePane">
+                                <div class="alert alert-info small mb-3">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Поддерживаемые форматы: WAV, MP3, OGG, FLAC
+                                </div>
+                                <div class="mb-3">
+                                    <input type="file" class="form-control" id="audioFile" accept="audio/*">
+                                </div>
+                                <div id="audioPlayerBox" style="display: none;">
+                                    <audio id="audioPlayer" class="w-100 mb-3" controls></audio>
+                                </div>
+                                <button id="processBtn" class="btn btn-primary-custom" disabled>
+                                    <i class="bi bi-play-fill me-1"></i>Распознать
+                                </button>
+                                <div class="progress mt-3" style="display: none;" id="progressBox">
+                                    <div id="progressBar" class="progress-bar" style="width: 0%">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Результаты транскрипции -->
+                    <div class="transcription-results">
+                        <div class="transcription-results-header">
+                            <span class="fw-semibold"><i class="bi bi-card-text me-2"></i>Результаты</span>
+                            <div>
+                                <button id="copyBtn" class="btn btn-sm btn-outline-secondary me-1" title="Копировать">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                                <button id="clearTranscriptBtn" class="btn btn-sm btn-outline-danger" title="Очистить">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="transcription-list">
+                            <ul id="transcriptList"></ul>
+                            <div class="empty-state" id="emptyTranscriptState">
+                                <i class="bi bi-mic-mute"></i>
+                                <p>Распознанный текст появится здесь</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Информационная панель -->
+        <div class="info-panel">
+            <span class="info-item">
+                <span class="info-label">Модель:</span>
+                <select id="modelSelect" class="form-select form-select-sm d-inline-block" style="width: auto; min-width: 200px;">
+                    <option value="">Загрузка...</option>
+                </select>
+            </span>
+            <span class="info-item">
+                <span class="info-label">Сервер:</span>
+                <span class="info-value" id="llmServerUrl">192.168.1.250:1234</span>
+            </span>
+            <span class="info-item">
+                <span class="info-label">Статус:</span>
+                <span class="info-value" id="serverStatus">Проверка...</span>
+            </span>
+            <span class="info-item">
+                <button id="llmSettingsBtn" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#llmSettingsModal">
+                    <i class="bi bi-gear"></i> Настройки LLM
+                </button>
+            </span>
+        </div>
+    </div>
+    
+    <!-- ==================== Модальное окно: Настройка ролей ==================== -->
+    <div class="modal fade" id="rolesModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-person-badge me-2"></i>Настройка ролей</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 22%;">Роль</th>
+                                <th>Системный промт</th>
+                                <th style="width: 100px;">Токены</th>
+                                <th style="width: 100px;">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rolesTableBody">
+                            <!-- Роли будут добавлены из JavaScript -->
+                        </tbody>
+                    </table>
+                    
+                    <hr>
+                    
+                    <h6><i class="bi bi-plus-circle me-1"></i>Добавить новую роль</h6>
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <input type="text" id="newRoleName" class="form-control" placeholder="Название роли">
+                        </div>
+                        <div class="col-md-5">
+                            <input type="text" id="newRolePrompt" class="form-control" placeholder="Системный промт">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="number" id="newRoleMaxTokens" class="form-control" placeholder="Токены" value="2048" min="256" max="8192">
+                        </div>
+                        <div class="col-md-2">
+                            <button id="addRoleBtn" class="btn btn-primary-custom w-100">
+                                <i class="bi bi-plus"></i> Добавить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ==================== Модальное окно: Редактирование роли ==================== -->
+    <div class="modal fade" id="editRoleModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Редактирование роли</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editRoleId">
+                    <div class="mb-3">
+                        <label class="form-label">Название роли</label>
+                        <input type="text" id="editRoleName" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Системный промт</label>
+                        <textarea id="editRolePrompt" class="form-control" rows="6"></textarea>
+                        <div class="form-text">Описание поведения и стиля ответов помощника</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Максимум токенов в ответе</label>
+                        <input type="number" id="editRoleMaxTokens" class="form-control" min="256" max="8192" step="256">
+                        <div class="form-text">Длина ответа LLM (256-8192). Для учителей рекомендуется 4096+</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" id="saveRoleBtn" class="btn btn-primary-custom">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ==================== Модальное окно: Настройки LLM ==================== -->
+    <div class="modal fade" id="llmSettingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-cpu me-2"></i>Настройки LLM</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">URL сервера LLM</label>
+                        <input type="text" id="llmSettingsBaseUrl" class="form-control" placeholder="http://192.168.1.250:1234/v1">
+                        <div class="form-text">Адрес LLM сервера (LM Studio, Ollama и др.)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">API токен</label>
+                        <div class="input-group">
+                            <input type="password" id="llmSettingsApiKey" class="form-control" placeholder="not-needed">
+                            <button class="btn btn-outline-secondary" type="button" id="toggleApiKeyBtn">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Для локальных моделей можно оставить "not-needed"</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Модель по умолчанию</label>
+                        <input type="text" id="llmSettingsModel" class="form-control" placeholder="google/gemma-3-4b">
+                        <div class="form-text">ID модели для использования</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Макс. токенов</label>
+                            <input type="number" id="llmSettingsMaxTokens" class="form-control" min="256" max="8192" step="256" value="2048">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Температура</label>
+                            <input type="number" id="llmSettingsTemperature" class="form-control" min="0" max="1" step="0.1" value="0.7">
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <small>Изменение URL и токена требует перезапуска сервера для применения.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" id="saveLlmSettingsBtn" class="btn btn-primary-custom">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // ========== Константы ==========
+        const CHUNK_SAMPLES = 2400;  // 300ms при 8kHz
+        const CHUNK_BYTES = CHUNK_SAMPLES * 2;
+        const SELECTED_ROLE_KEY = 'voiceTalker_selectedRole';  // Только выбранная роль хранится локально
+        
+        // ========== Маппинг голосов (имя и пол) ==========
+        const VOICE_MAPPING = {
+            // v3 и v5_ru стандартные голоса
+            'aidar': { name: 'Дима', gender: 'муж.' },
+            'baya': { name: 'Юля', gender: 'жен.' },
+            'kseniya': { name: 'Маша', gender: 'жен.' },
+            'xenia': { name: 'Женя', gender: 'жен.' },
+            'eugene': { name: 'Евгений', gender: 'муж.' },
+            
+            // v5_cis голоса (женские)
+            'ru_aigul': { name: 'Айгуль', gender: 'жен.' },
+            'ru_albina': { name: 'Альбина', gender: 'жен.' },
+            'ru_ekaterina': { name: 'Екатерина', gender: 'жен.' },
+            'ru_karina': { name: 'Карина', gender: 'жен.' },
+            'ru_kermen': { name: 'Кермен', gender: 'жен.' },
+            'ru_nurgul': { name: 'Нургуль', gender: 'жен.' },
+            'ru_oksana': { name: 'Оксана', gender: 'жен.' },
+            'ru_onaoy': { name: 'Онаой', gender: 'жен.' },
+            'ru_ramilia': { name: 'Рамиля', gender: 'жен.' },
+            'ru_saida': { name: 'Саида', gender: 'жен.' },
+            'ru_vika': { name: 'Вика', gender: 'жен.' },
+            'ru_zara': { name: 'Зара', gender: 'жен.' },
+            'ru_zhadyra': { name: 'Жадыра', gender: 'жен.' },
+            'ru_zhazira': { name: 'Жазира', gender: 'жен.' },
+            'ru_zinaida': { name: 'Зинаида', gender: 'жен.' },
+            'ru_alfia': { name: 'Альфия', gender: 'жен.' },
+            'ru_alfia2': { name: 'Альфия 2', gender: 'жен.' },
+            'ru_kejilgan': { name: 'Кежилган', gender: 'жен.' },
+            'ru_kermen': { name: 'Кермен', gender: 'жен.' },
+            'ru_miyau': { name: 'Мияу', gender: 'жен.' },
+            'ru_safarhuja': { name: 'Сафархужа', gender: 'жен.' },
+            'ru_sibday': { name: 'Сибдай', gender: 'жен.' },
+            
+            // v5_cis голоса (мужские)
+            'ru_alexandr': { name: 'Александр', gender: 'муж.' },
+            'ru_bogdan': { name: 'Богдан', gender: 'муж.' },
+            'ru_dmitriy': { name: 'Дмитрий', gender: 'муж.' },
+            'ru_eduard': { name: 'Эдуард', gender: 'муж.' },
+            'ru_gamat': { name: 'Гамат', gender: 'муж.' },
+            'ru_igor': { name: 'Игорь', gender: 'муж.' },
+            'ru_marat': { name: 'Марат', gender: 'муж.' },
+            'ru_roman': { name: 'Роман', gender: 'муж.' }
+        };
+        
+        // Функция для получения отображаемого имени голоса
+        function getVoiceDisplayName(voiceId) {
+            const mapping = VOICE_MAPPING[voiceId];
+            if (mapping) {
+                return `${mapping.name} (${mapping.gender})`;
+            }
+            // Если нет в маппинге, используем ID с заглавной буквы
+            return voiceId.charAt(0).toUpperCase() + voiceId.slice(1).replace(/_/g, ' ');
+        }
+        
+        // ========== DOM элементы ==========
+        const dom = {
+            // Статусы
+            asrStatus: document.getElementById('asrStatus'),
+            llmStatus: document.getElementById('llmStatus'),
+            ttsStatus: document.getElementById('ttsStatus'),
+            serverStatus: document.getElementById('serverStatus'),
+            modelSelect: document.getElementById('modelSelect'),
+            llmServerUrl: document.getElementById('llmServerUrl'),
+            
+            // Настройки LLM
+            llmSettingsBaseUrl: document.getElementById('llmSettingsBaseUrl'),
+            llmSettingsApiKey: document.getElementById('llmSettingsApiKey'),
+            llmSettingsModel: document.getElementById('llmSettingsModel'),
+            llmSettingsMaxTokens: document.getElementById('llmSettingsMaxTokens'),
+            llmSettingsTemperature: document.getElementById('llmSettingsTemperature'),
+            saveLlmSettingsBtn: document.getElementById('saveLlmSettingsBtn'),
+            toggleApiKeyBtn: document.getElementById('toggleApiKeyBtn'),
+            
+            // Роли и голос
+            roleSelect: document.getElementById('roleSelect'),
+            voiceSelect: document.getElementById('voiceSelect'),
+            currentRoleName: document.getElementById('currentRoleName'),
+            rolesTableBody: document.getElementById('rolesTableBody'),
+            newRoleName: document.getElementById('newRoleName'),
+            newRolePrompt: document.getElementById('newRolePrompt'),
+            newRoleMaxTokens: document.getElementById('newRoleMaxTokens'),
+            addRoleBtn: document.getElementById('addRoleBtn'),
+            editRoleId: document.getElementById('editRoleId'),
+            editRoleName: document.getElementById('editRoleName'),
+            editRolePrompt: document.getElementById('editRolePrompt'),
+            editRoleMaxTokens: document.getElementById('editRoleMaxTokens'),
+            saveRoleBtn: document.getElementById('saveRoleBtn'),
+            
+            // Чат
+            chatMessages: document.getElementById('chatMessages'),
+            emptyChatState: document.getElementById('emptyChatState'),
+            chatInput: document.getElementById('chatInput'),
+            sendChatBtn: document.getElementById('sendChatBtn'),
+            clearChatBtn: document.getElementById('clearChatBtn'),
+            startChatBtn: document.getElementById('startChatBtn'),
+            stopChatBtn: document.getElementById('stopChatBtn'),
+            stopGenerationBtn: document.getElementById('stopGenerationBtn'),
+            chatRecordingIndicator: document.getElementById('chatRecordingIndicator'),
+            chatTimerDisplay: document.getElementById('chatTimerDisplay'),
+            
+            // Транскрипция - микрофон
+            waveform: document.getElementById('waveform'),
+            startRecBtn: document.getElementById('startRecBtn'),
+            stopRecBtn: document.getElementById('stopRecBtn'),
+            transcriptTimerDisplay: document.getElementById('transcriptTimerDisplay'),
+            
+            // Транскрипция - файл
+            audioFile: document.getElementById('audioFile'),
+            audioPlayer: document.getElementById('audioPlayer'),
+            audioPlayerBox: document.getElementById('audioPlayerBox'),
+            processBtn: document.getElementById('processBtn'),
+            progressBox: document.getElementById('progressBox'),
+            progressBar: document.getElementById('progressBar'),
+            
+            // Транскрипция - результаты
+            transcriptList: document.getElementById('transcriptList'),
+            emptyTranscriptState: document.getElementById('emptyTranscriptState'),
+            copyBtn: document.getElementById('copyBtn'),
+            clearTranscriptBtn: document.getElementById('clearTranscriptBtn')
+        };
+        
+        // ========== Состояние ==========
+        let waveCtx = dom.waveform.getContext('2d');
+        let waveAnimationFrame = null;
+        let waveAudioData = new Float32Array(dom.waveform.width);
+        
+        // Для чата
+        let chatMediaStream = null;
+        let chatAudioCtx = null;
+        let chatProcessor = null;
+        let chatWs = null;
+        let chatTimerInterval = null;
+        let chatStartTime = null;
+        
+        // Для транскрипции
+        let transcriptMediaStream = null;
+        let transcriptAudioCtx = null;
+        let transcriptProcessor = null;
+        let transcriptWs = null;
+        let transcriptTimerInterval = null;
+        let transcriptStartTime = null;
+        
+        let transcripts = [];
+        let chatHistory = [];
+        let roles = [];
+        let currentRoleId = 'universal';
+        
+        // ========== Управление ролями (через API) ==========
+        // Примечание: роли хранятся в БД на сервере, только выбранная роль - в localStorage
+        
+        async function loadRoles() {
+            try {
+                const response = await fetch('/api/roles');
+                if (response.ok) {
+                    const data = await response.json();
+                    roles = data.roles || [];
+                    
+                    // Загрузка выбранной роли из localStorage
+                    const selectedRole = localStorage.getItem(SELECTED_ROLE_KEY);
+                    if (selectedRole && roles.find(r => r.id === selectedRole)) {
+                        currentRoleId = selectedRole;
+                    } else if (roles.length > 0) {
+                        currentRoleId = roles[0].id;
+                    }
+                    
+                    renderRoleSelect();
+                    renderRolesTable();
+                } else {
+                    console.error('Ошибка загрузки ролей:', response.statusText);
+                }
+            } catch (e) {
+                console.error('Ошибка загрузки ролей:', e);
+            }
+        }
+        
+        function saveSelectedRole() {
+            localStorage.setItem(SELECTED_ROLE_KEY, currentRoleId);
+        }
+        
+        function renderRoleSelect() {
+            dom.roleSelect.innerHTML = roles.map(role => 
+                `<option value="${role.id}" ${role.id === currentRoleId ? 'selected' : ''}>${role.name}</option>`
+            ).join('');
+            
+            updateCurrentRoleBadge();
+        }
+        
+        function updateCurrentRoleBadge() {
+            const role = roles.find(r => r.id === currentRoleId);
+            if (role) {
+                dom.currentRoleName.textContent = role.name;
+            }
+        }
+        
+        function renderRolesTable() {
+            dom.rolesTableBody.innerHTML = roles.map(role => `
+                <tr>
+                    <td><strong>${role.name}</strong></td>
+                    <td>
+                        <div class="prompt-preview" title="${role.prompt.replace(/"/g, '&quot;')}">${role.prompt.substring(0, 80)}...</div>
+                    </td>
+                    <td class="text-center">${role.max_tokens || 2048}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="openEditRole('${role.id}')" title="Редактировать">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        ${!role.is_default ? `
+                        <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteRole('${role.id}')" title="Удалить">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function openEditRole(roleId) {
+            const role = roles.find(r => r.id === roleId);
+            if (!role) return;
+            
+            dom.editRoleId.value = role.id;
+            dom.editRoleName.value = role.name;
+            dom.editRolePrompt.value = role.prompt;
+            dom.editRoleMaxTokens.value = role.max_tokens || 2048;
+            
+            const modal = new bootstrap.Modal(document.getElementById('editRoleModal'));
+            modal.show();
+        }
+        
+        async function saveEditedRole() {
+            const roleId = dom.editRoleId.value;
+            const roleData = {
+                name: dom.editRoleName.value.trim(),
+                prompt: dom.editRolePrompt.value.trim(),
+                max_tokens: parseInt(dom.editRoleMaxTokens.value) || 2048
+            };
+            
+            try {
+                const response = await fetch(`/api/roles/${roleId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(roleData)
+                });
+                
+                if (response.ok) {
+                    await loadRoles();  // Перезагружаем роли из БД
+                    bootstrap.Modal.getInstance(document.getElementById('editRoleModal')).hide();
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка: ' + (error.detail || 'Не удалось сохранить роль'));
+                }
+            } catch (e) {
+                console.error('Ошибка сохранения роли:', e);
+                alert('Ошибка сохранения роли');
+            }
+        }
+        
+        async function deleteRole(roleId) {
+            if (!confirm('Удалить эту роль?')) return;
+            
+            try {
+                const response = await fetch(`/api/roles/${roleId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    if (currentRoleId === roleId) {
+                        currentRoleId = 'universal';
+                        saveSelectedRole();
+                    }
+                    await loadRoles();  // Перезагружаем роли из БД
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка: ' + (error.detail || 'Не удалось удалить роль'));
+                }
+            } catch (e) {
+                console.error('Ошибка удаления роли:', e);
+                alert('Ошибка удаления роли');
+            }
+        }
+        
+        async function addNewRole() {
+            const name = dom.newRoleName.value.trim();
+            const prompt = dom.newRolePrompt.value.trim();
+            const max_tokens = parseInt(dom.newRoleMaxTokens.value) || 2048;
+            
+            if (!name || !prompt) {
+                alert('Заполните название и промт');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/roles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, prompt, max_tokens })
+                });
+                
+                if (response.ok) {
+                    await loadRoles();  // Перезагружаем роли из БД
+                    dom.newRoleName.value = '';
+                    dom.newRolePrompt.value = '';
+                    dom.newRoleMaxTokens.value = '2048';
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка: ' + (error.detail || 'Не удалось создать роль'));
+                }
+            } catch (e) {
+                console.error('Ошибка создания роли:', e);
+                alert('Ошибка создания роли');
+            }
+        }
+        
+        function getCurrentRolePrompt() {
+            const role = roles.find(r => r.id === currentRoleId);
+            return role ? role.prompt : '';
+        }
+        
+        function getCurrentRoleMaxTokens() {
+            const role = roles.find(r => r.id === currentRoleId);
+            return role ? (role.max_tokens || 2048) : 2048;
+        }
+        
+        // ========== Переключение темы ==========
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+            setTheme(theme);
+        }
+        
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            updateThemeIcon(theme);
+        }
+        
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        }
+        
+        function updateThemeIcon(theme) {
+            const lightIcon = document.querySelector('.theme-icon-light');
+            const darkIcon = document.querySelector('.theme-icon-dark');
+            if (lightIcon && darkIcon) {
+                if (theme === 'dark') {
+                    lightIcon.style.display = 'none';
+                    darkIcon.style.display = 'block';
+                } else {
+                    lightIcon.style.display = 'block';
+                    darkIcon.style.display = 'none';
+                }
+            }
+        }
+        
+        // ========== Инициализация ==========
+        async function init() {
+            initTheme();
+            await loadRoles();
+            
+            await checkServerStatus();
+            resizeWaveform();
+            window.addEventListener('resize', resizeWaveform);
+            
+            // Пытаемся загрузить голоса сразу (если TTS уже готов)
+            await loadAvailableVoices();
+        }
+        
+        async function checkServerStatus() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    dom.serverStatus.textContent = 'Онлайн';
+                    dom.serverStatus.className = 'info-value text-success';
+                    
+                    if (data.asr_initialized) {
+                        setStatus(dom.asrStatus, true);
+                    }
+                    
+                    if (data.llm_available) {
+                        setStatus(dom.llmStatus, true);
+                        await loadLLMInfo();
+                    }
+                    
+                    await checkTTSStatus();
+                }
+            } catch (e) {
+                dom.serverStatus.textContent = 'Офлайн';
+                dom.serverStatus.className = 'info-value text-danger';
+            }
+        }
+        
+        async function checkTTSStatus() {
+            try {
+                const response = await fetch('/api/tts/status');
+                const data = await response.json();
+                if (data.ready) {
+                    setStatus(dom.ttsStatus, true);
+                    // Загружаем список голосов после проверки статуса
+                    await loadAvailableVoices();
+                }
+            } catch (e) {
+                console.warn('TTS статус недоступен:', e);
+            }
+        }
+        
+        // ========== Загрузка доступных голосов ==========
+        async function loadAvailableVoices() {
+            try {
+                const response = await fetch('/api/tts/speakers');
+                const data = await response.json();
+                
+                if (data.speakers && data.speakers.length > 0) {
+                    // Сохраняем текущий выбранный голос
+                    const currentVoice = dom.voiceSelect.value;
+                    
+                    // Очищаем список
+                    dom.voiceSelect.innerHTML = '';
+                    
+                    // Добавляем голоса с правильными именами
+                    data.speakers.forEach(voiceId => {
+                        const option = document.createElement('option');
+                        option.value = voiceId;
+                        option.textContent = getVoiceDisplayName(voiceId);
+                        dom.voiceSelect.appendChild(option);
+                    });
+                    
+                    // Восстанавливаем выбранный голос, если он доступен
+                    if (data.speakers.includes(currentVoice)) {
+                        dom.voiceSelect.value = currentVoice;
+                    } else if (data.default) {
+                        dom.voiceSelect.value = data.default;
+                    } else if (data.speakers.length > 0) {
+                        dom.voiceSelect.value = data.speakers[0];
+                    }
+                }
+            } catch (e) {
+                console.warn('Ошибка загрузки голосов:', e);
+                // В случае ошибки оставляем дефолтные голоса
+            }
+        }
+        
+        async function loadLLMInfo() {
+            try {
+                // Загружаем информацию о сервере
+                const testResponse = await fetch('/api/llm/test');
+                const testData = await testResponse.json();
+                if (testData.status === 'ok') {
+                    dom.llmServerUrl.textContent = testData.base_url.replace('http://', '').replace('/v1', '');
+                }
+                
+                // Загружаем список доступных моделей
+                await loadAvailableModels();
+            } catch (e) {
+                console.error('Ошибка загрузки информации о LLM:', e);
+            }
+        }
+        
+        async function loadAvailableModels() {
+            try {
+                const response = await fetch('/api/llm/models');
+                const data = await response.json();
+                
+                if (data.models && data.models.length > 0) {
+                    // Заполняем выпадающий список моделями
+                    dom.modelSelect.innerHTML = data.models.map(model => 
+                        `<option value="${model.id}" ${model.id === data.current ? 'selected' : ''}>${model.id}</option>`
+                    ).join('');
+                } else {
+                    dom.modelSelect.innerHTML = '<option value="">Нет доступных моделей</option>';
+                }
+            } catch (e) {
+                console.error('Ошибка загрузки списка моделей:', e);
+                dom.modelSelect.innerHTML = '<option value="">Ошибка загрузки</option>';
+            }
+        }
+        
+        async function changeModel(modelId) {
+            if (!modelId) return;
+            
+            try {
+                const response = await fetch('/api/llm/model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: modelId })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Модель изменена на:', data.model);
+                } else {
+                    console.error('Ошибка смены модели');
+                    // Перезагружаем список чтобы вернуть правильное значение
+                    await loadAvailableModels();
+                }
+            } catch (e) {
+                console.error('Ошибка смены модели:', e);
+            }
+        }
+        
+        // ========== Настройки LLM ==========
+        async function loadLlmSettings() {
+            try {
+                const response = await fetch('/api/settings/llm');
+                if (response.ok) {
+                    const data = await response.json();
+                    dom.llmSettingsBaseUrl.value = data.base_url || '';
+                    dom.llmSettingsApiKey.value = data.api_key || '';
+                    dom.llmSettingsModel.value = data.model || '';
+                    dom.llmSettingsMaxTokens.value = data.max_tokens || 2048;
+                    dom.llmSettingsTemperature.value = data.temperature || 0.7;
+                }
+            } catch (e) {
+                console.error('Ошибка загрузки настроек LLM:', e);
+            }
+        }
+        
+        async function saveLlmSettings() {
+            const settings = {
+                base_url: dom.llmSettingsBaseUrl.value.trim(),
+                api_key: dom.llmSettingsApiKey.value.trim(),
+                model: dom.llmSettingsModel.value.trim(),
+                max_tokens: parseInt(dom.llmSettingsMaxTokens.value) || 2048,
+                temperature: parseFloat(dom.llmSettingsTemperature.value) || 0.7
+            };
+            
+            try {
+                const response = await fetch('/api/settings/llm', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    bootstrap.Modal.getInstance(document.getElementById('llmSettingsModal')).hide();
+                    
+                    // Обновляем отображение URL сервера
+                    dom.llmServerUrl.textContent = settings.base_url.replace('http://', '').replace('/v1', '');
+                    
+                    // Показываем уведомление
+                    if (data.note) {
+                        alert('Настройки сохранены. ' + data.note);
+                    }
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка: ' + (error.detail || 'Не удалось сохранить настройки'));
+                }
+            } catch (e) {
+                console.error('Ошибка сохранения настроек LLM:', e);
+                alert('Ошибка сохранения настроек');
+            }
+        }
+        
+        function toggleApiKeyVisibility() {
+            const input = dom.llmSettingsApiKey;
+            const btn = dom.toggleApiKeyBtn;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+            } else {
+                input.type = 'password';
+                btn.innerHTML = '<i class="bi bi-eye"></i>';
+            }
+        }
+        
+        function setStatus(element, connected) {
+            element.className = connected 
+                ? 'status-indicator status-connected' 
+                : 'status-indicator status-disconnected';
+        }
+        
+        function resizeWaveform() {
+            dom.waveform.width = dom.waveform.parentElement.clientWidth;
+            waveAudioData = new Float32Array(dom.waveform.width);
+        }
+        
+        // ========== Таймеры ==========
+        function startTimer(displayElement, onUpdate) {
+            const startTime = Date.now();
+            displayElement.style.display = 'inline';
+            
+            return setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                const s = String(elapsed % 60).padStart(2, '0');
+                displayElement.textContent = `${m}:${s}`;
+            }, 1000);
+        }
+        
+        function stopTimer(intervalId, displayElement) {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+            displayElement.textContent = '00:00';
+            displayElement.style.display = 'none';
+        }
+        
+        // ========== Волновая форма ==========
+        function drawWaveform() {
+            waveAnimationFrame = requestAnimationFrame(drawWaveform);
+            waveCtx.fillStyle = '#f1f5f9';
+            waveCtx.fillRect(0, 0, dom.waveform.width, dom.waveform.height);
+            
+            const centerY = dom.waveform.height / 2;
+            const step = Math.max(1, Math.floor(waveAudioData.length / dom.waveform.width));
+            
+            waveCtx.beginPath();
+            waveCtx.strokeStyle = '#6366f1';
+            waveCtx.lineWidth = 2;
+            
+            for (let i = 0; i < dom.waveform.width; i++) {
+                const index = i * step;
+                const y = centerY + waveAudioData[index] * centerY * 0.9;
+                if (i === 0) {
+                    waveCtx.moveTo(i, y);
+                } else {
+                    waveCtx.lineTo(i, y);
+                }
+            }
+            waveCtx.stroke();
+        }
+        
+        function updateWaveformData(data) {
+            for (let i = 0; i < waveAudioData.length; i++) {
+                waveAudioData[i] = Math.max(-1, Math.min(1, data[i] || 0));
+            }
+        }
+        
+        function stopWaveform() {
+            if (waveAnimationFrame) {
+                cancelAnimationFrame(waveAnimationFrame);
+                waveAnimationFrame = null;
+            }
+            waveCtx.fillStyle = '#f1f5f9';
+            waveCtx.fillRect(0, 0, dom.waveform.width, dom.waveform.height);
+        }
+        
+        // ========== Выбранный голос ==========
+        function getChatSpeaker() {
+            return dom.voiceSelect ? dom.voiceSelect.value : 'kseniya';
+        }
+        
+        // ========== Аудио хелперы ==========
+        function floatToPCM16(floatBuf) {
+            const pcm = new Int16Array(floatBuf.length);
+            for (let i = 0; i < floatBuf.length; i++) {
+                const s = Math.max(-1, Math.min(1, floatBuf[i]));
+                pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            return pcm;
+        }
+        
+        // ========== Очередь воспроизведения аудио ==========
+        const audioQueue = [];
+        let isPlayingAudio = false;
+        
+        function playAudioBase64(base64Data) {
+            audioQueue.push(base64Data);
+            // Примечание: показываем кнопку "Стоп" при добавлении аудио в очередь
+            dom.stopGenerationBtn.style.display = 'inline-flex';
+            processAudioQueue();
+        }
+        
+        // Примечание: храним текущий аудио элемент для возможности остановки
+        let currentAudioElement = null;
+        
+        function processAudioQueue() {
+            if (isPlayingAudio || audioQueue.length === 0) return;
+            
+            isPlayingAudio = true;
+            const base64Data = audioQueue.shift();
+            
+            try {
+                const audioData = atob(base64Data);
+                const arrayBuffer = new Uint8Array(audioData.length);
+                for (let i = 0; i < audioData.length; i++) {
+                    arrayBuffer[i] = audioData.charCodeAt(i);
+                }
+                
+                const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(blob);
+                const audio = new Audio(audioUrl);
+                currentAudioElement = audio;
+                
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    isPlayingAudio = false;
+                    currentAudioElement = null;
+                    
+                    // Примечание: скрываем кнопку "Стоп" после завершения воспроизведения
+                    // Проверяем, что очередь пуста и больше нет аудио для воспроизведения
+                    if (audioQueue.length === 0) {
+                        dom.stopGenerationBtn.style.display = 'none';
+                    }
+                    
+                    processAudioQueue();
+                };
+                
+                audio.onerror = (e) => {
+                    console.error('Ошибка воспроизведения:', e);
+                    URL.revokeObjectURL(audioUrl);
+                    isPlayingAudio = false;
+                    currentAudioElement = null;
+                    
+                    // Примечание: скрываем кнопку "Стоп" при ошибке воспроизведения
+                    if (audioQueue.length === 0) {
+                        dom.stopGenerationBtn.style.display = 'none';
+                    }
+                    
+                    processAudioQueue();
+                };
+                
+                audio.play().catch(e => {
+                    console.error('Ошибка запуска воспроизведения:', e);
+                    isPlayingAudio = false;
+                    currentAudioElement = null;
+                    
+                    // Примечание: скрываем кнопку "Стоп" при ошибке запуска
+                    if (audioQueue.length === 0) {
+                        dom.stopGenerationBtn.style.display = 'none';
+                    }
+                    
+                    processAudioQueue();
+                });
+            } catch (e) {
+                console.error('Ошибка декодирования аудио:', e);
+                isPlayingAudio = false;
+                currentAudioElement = null;
+                
+                // Примечание: скрываем кнопку "Стоп" при ошибке декодирования
+                if (audioQueue.length === 0) {
+                    dom.stopGenerationBtn.style.display = 'none';
+                }
+                
+                processAudioQueue();
+            }
+        }
+        
+        // Примечание: функция для остановки воспроизведения аудио
+        function stopAudioPlayback() {
+            console.log('stopAudioPlayback вызвана, currentAudioElement:', currentAudioElement, 'isPlayingAudio:', isPlayingAudio, 'queue length:', audioQueue.length);
+            if (currentAudioElement) {
+                try {
+                    currentAudioElement.pause();
+                    currentAudioElement.currentTime = 0;
+                    console.log('Аудио элемент остановлен');
+                } catch (e) {
+                    console.error('Ошибка при остановке аудио элемента:', e);
+                }
+                currentAudioElement = null;
+            }
+            audioQueue.length = 0;  // Очищаем очередь
+            isPlayingAudio = false;
+            
+            // Примечание: скрываем кнопку "Стоп" после остановки воспроизведения
+            dom.stopGenerationBtn.style.display = 'none';
+            
+            console.log('Воспроизведение остановлено, очередь очищена');
+        }
+        
+        // ========== Чат: Голосовой ввод ==========
+        async function startChatRecording() {
+            try {
+                chatMediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 8000 },
+                    video: false
+                });
+                
+                chatAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
+                const input = chatAudioCtx.createMediaStreamSource(chatMediaStream);
+                chatProcessor = (chatAudioCtx.createScriptProcessor || chatAudioCtx.createJavaScriptNode).call(chatAudioCtx, 1024, 1, 1);
+                
+                input.connect(chatProcessor);
+                chatProcessor.connect(chatAudioCtx.destination);
+                
+                // WebSocket для чата с LLM
+                // Примечание: передаем историю сообщений для контекста
+                const speaker = getChatSpeaker();
+                const systemPrompt = encodeURIComponent(getCurrentRolePrompt());
+                const maxTokens = getCurrentRoleMaxTokens();
+                // Формируем историю для передачи на сервер (последние 12 сообщений)
+                const historyContext = chatHistory.slice(-12).map(m => 
+                    `${m.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${m.text}`
+                ).join('\n');
+                const historyParam = encodeURIComponent(historyContext);
+                const wsUrl = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/ws/chat?speaker=${speaker}&system_prompt=${systemPrompt}&max_tokens=${maxTokens}&history=${historyParam}`;
+                chatWs = new WebSocket(wsUrl);
+                chatWs.binaryType = 'arraybuffer';
+                
+                let pendingLlmResponse = null;
+                
+                // Примечание: команды для остановки воспроизведения (одно слово)
+                const stopPlaybackCommands = ['стоп', 'достаточно', 'хватит', 'понятно'];
+                // Примечание: команды для завершения разговора (могут быть фразами)
+                const endConversationCommands = ['конец разговора', 'пока', 'досвидания', 'до свидания'];
+                
+                chatWs.onmessage = (ev) => {
+                    try {
+                        const msg = JSON.parse(ev.data);
+                        
+                        if (msg.event === 'transcript') {
+                            const recognizedText = msg.phrase.text.toLowerCase().trim();
+                            
+                            // Примечание: проверяем команды остановки воспроизведения (одно слово)
+                            // Используем флаг от сервера или проверяем локально для быстрой реакции
+                            // Примечание: проверяем, содержит ли текст одно из командных слов как отдельное слово
+                            let isStopCommand = msg.is_stop_command;
+                            if (!isStopCommand) {
+                                // Проверяем, содержит ли распознанный текст одно из командных слов
+                                // Для кириллицы используем проверку с пробелами и знаками препинания
+                                const words = recognizedText.split(/[\s\.,!?;:]+/);
+                                for (const cmd of stopPlaybackCommands) {
+                                    if (words.includes(cmd) || recognizedText === cmd) {
+                                        isStopCommand = true;
+                                        console.log('Обнаружена команда остановки:', cmd, 'в тексте:', recognizedText);
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            if (isStopCommand) {
+                                console.log('Останавливаем воспроизведение аудио, команда:', recognizedText);
+                                stopAudioPlayback();
+                                // Примечание: показываем визуальную обратную связь пользователю
+                                const systemDiv = document.createElement('div');
+                                systemDiv.className = 'message message-assistant';
+                                systemDiv.style.opacity = '0.7';
+                                systemDiv.style.fontStyle = 'italic';
+                                systemDiv.innerHTML = `<small>[Команда: ${msg.phrase.text}] Воспроизведение остановлено</small>`;
+                                dom.chatMessages.appendChild(systemDiv);
+                                dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+                                // Не отправляем в LLM, просто останавливаем воспроизведение
+                                return;
+                            }
+                            
+                            // Примечание: проверяем команды завершения разговора
+                            // Используем флаг от сервера или проверяем локально
+                            const isEndCommand = msg.is_end_command || endConversationCommands.some(cmd => recognizedText.includes(cmd));
+                            
+                            if (isEndCommand) {
+                                // Останавливаем запись, но отправляем в LLM для ответа
+                                appendChatMessage(msg.phrase.text, 'user');
+                                // Отправляем пустой пакет для завершения записи
+                                if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+                                    chatWs.send(new Uint8Array());
+                                }
+                                // Примечание: устанавливаем флаг для остановки записи после получения ответа
+                                window.shouldStopAfterResponse = true;
+                                // Ждем ответа от LLM, затем остановим запись
+                                return;
+                            }
+                            
+                            // Обычная обработка - добавляем сообщение
+                            appendChatMessage(msg.phrase.text, 'user');
+                        } else if (msg.event === 'llm_response_start') {
+                            // Примечание: начало потоковой генерации - создаем пустое сообщение
+                            pendingLlmResponse = '';
+                            const tempDiv = document.createElement('div');
+                            tempDiv.className = 'message message-assistant';
+                            tempDiv.id = 'streaming-message';
+                            tempDiv.innerHTML = '<span class="streaming-indicator">Генерирую ответ...</span>';
+                            dom.chatMessages.appendChild(tempDiv);
+                            dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+                            // Показываем кнопку "Стоп" для остановки генерации
+                            dom.stopGenerationBtn.style.display = 'inline-flex';
+                        } else if (msg.event === 'llm_response_chunk') {
+                            // Примечание: получаем часть текста - обновляем сообщение
+                            if (pendingLlmResponse !== null) {
+                                pendingLlmResponse += msg.text;
+                                // Удаляем блоки размышлений из текста перед отображением
+                                const textWithoutThink = pendingLlmResponse.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                                const streamingDiv = document.getElementById('streaming-message');
+                                if (streamingDiv) {
+                                    streamingDiv.innerHTML = convertTextToHtml(textWithoutThink);
+                                    dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+                                }
+                            }
+                        } else if (msg.event === 'llm_response_end' || msg.event === 'llm_response_interrupted') {
+                            // Примечание: завершение генерации - финализируем сообщение
+                            // Скрываем кнопку "Стоп"
+                            dom.stopGenerationBtn.style.display = 'none';
+                            
+                            if (pendingLlmResponse !== null) {
+                                let finalText = msg.text || pendingLlmResponse;
+                                // Удаляем блоки размышлений из финального текста
+                                finalText = finalText.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                                finalText = finalText.replace(/&lt;think&gt;[\s\S]*?&lt;\/think&gt;/gi, '');
+                                // Удаляем незакрытые блоки <think>
+                                finalText = finalText.replace(/<think>[\s\S]*$/gi, '');
+                                finalText = finalText.replace(/&lt;think&gt;[\s\S]*$/gi, '');
+                                
+                                const streamingDiv = document.getElementById('streaming-message');
+                                if (streamingDiv) {
+                                    streamingDiv.id = ''; // Убираем временный ID
+                                    streamingDiv.innerHTML = convertTextToHtml(finalText);
+                                    if (msg.event === 'llm_response_interrupted') {
+                                        // Добавляем пометку о прерывании
+                                        const interruptedNote = document.createElement('div');
+                                        interruptedNote.className = 'text-muted small mt-1';
+                                        interruptedNote.textContent = '(Генерация прервана)';
+                                        streamingDiv.appendChild(interruptedNote);
+                                    }
+                                } else {
+                                    appendChatMessage(finalText, 'assistant');
+                                }
+                                // Добавляем в историю
+                                chatHistory.push({ role: 'assistant', text: finalText });
+                                pendingLlmResponse = null;
+                                
+                                // Примечание: если была команда завершения, останавливаем запись после ответа
+                                if (window.shouldStopAfterResponse) {
+                                    window.shouldStopAfterResponse = false;
+                                    stopChatRecording();
+                                }
+                            }
+                        } else if (msg.event === 'llm_response') {
+                            // Примечание: fallback для старого формата (не потоковый)
+                            // Скрываем кнопку "Стоп"
+                            dom.stopGenerationBtn.style.display = 'none';
+                            // Удаляем блоки размышлений из текста
+                            let responseText = msg.text;
+                            responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                            responseText = responseText.replace(/&lt;think&gt;[\s\S]*?&lt;\/think&gt;/gi, '');
+                            responseText = responseText.replace(/<think>[\s\S]*$/gi, '');
+                            responseText = responseText.replace(/&lt;think&gt;[\s\S]*$/gi, '');
+                            pendingLlmResponse = responseText;
+                            setTimeout(() => {
+                                if (pendingLlmResponse) {
+                                    appendChatMessage(pendingLlmResponse, 'assistant');
+                                    pendingLlmResponse = null;
+                                    // Примечание: если была команда завершения, останавливаем запись после ответа
+                                    if (window.shouldStopAfterResponse) {
+                                        window.shouldStopAfterResponse = false;
+                                        stopChatRecording();
+                                    }
+                                }
+                            }, 5000);
+                        } else if (msg.event === 'tts_audio') {
+                            // Примечание: озвучиваем абзац (потоковое озвучивание)
+                            playAudioBase64(msg.audio_base64);
+                        } else if (msg.event === 'llm_response_error') {
+                            // Примечание: ошибка генерации
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'message message-assistant';
+                            errorDiv.style.color = 'red';
+                            errorDiv.innerHTML = `Ошибка: ${msg.message || 'Не удалось получить ответ'}`;
+                            dom.chatMessages.appendChild(errorDiv);
+                            dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+                            pendingLlmResponse = null;
+                        }
+                    } catch (e) {
+                        console.error('Ошибка парсинга:', e);
+                    }
+                };
+                
+                chatWs.onerror = (e) => console.error('WebSocket ошибка:', e);
+                chatWs.onclose = () => console.log('WebSocket закрыт');
+                
+                let buffer8k = [];
+                chatProcessor.onaudioprocess = (ev) => {
+                    const data = ev.inputBuffer.getChannelData(0);
+                    buffer8k.push(...data);
+                    
+                    while (buffer8k.length >= CHUNK_SAMPLES) {
+                        const chunk = buffer8k.slice(0, CHUNK_SAMPLES);
+                        buffer8k = buffer8k.slice(CHUNK_SAMPLES);
+                        const pcm16 = floatToPCM16(chunk);
+                        
+                        if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+                            chatWs.send(new Uint8Array(pcm16.buffer));
+                        }
+                    }
+                };
+                
+                chatTimerInterval = startTimer(dom.chatTimerDisplay);
+                
+                dom.startChatBtn.style.display = 'none';
+                dom.stopChatBtn.style.display = 'inline-flex';
+                dom.chatRecordingIndicator.style.display = 'inline-flex';
+                
+            } catch (e) {
+                alert('Не удалось получить доступ к микрофону: ' + e.message);
+                console.error(e);
+            }
+        }
+        
+        function stopChatRecording() {
+            if (chatProcessor) {
+                chatProcessor.disconnect();
+                chatProcessor.onaudioprocess = null;
+                chatProcessor = null;
+            }
+            
+            if (chatAudioCtx) {
+                chatAudioCtx.close();
+                chatAudioCtx = null;
+            }
+            
+            if (chatMediaStream) {
+                chatMediaStream.getTracks().forEach(t => t.stop());
+                chatMediaStream = null;
+            }
+            
+            if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+                chatWs.send(new Uint8Array());
+            }
+            
+            stopTimer(chatTimerInterval, dom.chatTimerDisplay);
+            chatTimerInterval = null;
+            
+            dom.startChatBtn.style.display = 'inline-flex';
+            dom.stopChatBtn.style.display = 'none';
+            dom.chatRecordingIndicator.style.display = 'none';
+        }
+        
+        // ========== Чат: Сообщения ==========
+        function appendChatMessage(text, role, audioBase64 = null) {
+            dom.emptyChatState.style.display = 'none';
+            chatHistory.push({ role, text });
+            
+            const div = document.createElement('div');
+            div.className = `message message-${role}`;
+            div.innerHTML = convertTextToHtml(text);
+            
+            if (role === 'assistant' && audioBase64) {
+                const audioBtn = document.createElement('button');
+                audioBtn.className = 'btn btn-sm btn-outline-primary mt-2';
+                audioBtn.innerHTML = '<i class="bi bi-volume-up"></i> Озвучить';
+                audioBtn.onclick = () => playAudioBase64(audioBase64);
+                div.appendChild(document.createElement('br'));
+                div.appendChild(audioBtn);
+                playAudioBase64(audioBase64);
+            }
+            
+            dom.chatMessages.appendChild(div);
+            dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+        }
+        
+        // ========== Преобразование таблиц ==========
+        function convertTableToHtml(tableText) {
+            /**
+             * Преобразует Markdown таблицу в HTML таблицу
+             * Формат: | Заголовок1 | Заголовок2 |\n| :--- | :---: |\n| Ячейка1 | Ячейка2 |
+             */
+            const lines = tableText.trim().split('\n').filter(line => line.trim());
+            if (lines.length < 2) return tableText;
+            
+            // Первая строка - заголовки
+            // Разбиваем по | и убираем пустые элементы в начале/конце
+            const headerCells = lines[0].split('|').map(h => h.trim());
+            const headers = headerCells.filter((h, idx) => idx > 0 && idx < headerCells.length - 1);
+            
+            if (headers.length === 0) return tableText;
+            
+            // Вторая строка - разделитель (пропускаем)
+            // Остальные строки - данные
+            const rows = [];
+            for (let i = 2; i < lines.length; i++) {
+                const cells = lines[i].split('|').map(c => c.trim());
+                // Фильтруем: убираем первый и последний элемент (пустые из-за | в начале/конце)
+                const rowData = cells.filter((cell, idx) => idx > 0 && idx < cells.length - 1);
+                // Обрезаем до длины заголовков
+                rows.push(rowData.slice(0, headers.length));
+            }
+            
+            // Функция для обработки Markdown внутри ячеек таблицы
+            function processCellMarkdown(text) {
+                if (!text) return '';
+                // Обрабатываем жирный текст **text**
+                text = text.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+                // Обрабатываем курсив *text* (но не если это часть списка)
+                text = text.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>');
+                // Экранируем HTML (после обработки Markdown)
+                text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                // Восстанавливаем теги после экранирования (strong и em уже созданы)
+                text = text.replace(/&lt;strong&gt;/g, '<strong>');
+                text = text.replace(/&lt;\/strong&gt;/g, '</strong>');
+                text = text.replace(/&lt;em&gt;/g, '<em>');
+                text = text.replace(/&lt;\/em&gt;/g, '</em>');
+                return text;
+            }
+            
+            let html = '<table class="table table-bordered table-sm mt-2 mb-2"><thead><tr>';
+            headers.forEach(header => {
+                const processedHeader = processCellMarkdown(header);
+                html += `<th>${processedHeader}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            rows.forEach(row => {
+                html += '<tr>';
+                headers.forEach((header, idx) => {
+                    const cell = (row[idx] !== undefined && row[idx] !== null) ? row[idx] : '';
+                    const processedCell = processCellMarkdown(cell);
+                    html += `<td>${processedCell}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+        
+        function convertTableToText(tableText) {
+            /**
+             * Преобразует Markdown таблицу в читаемый текст для TTS
+             * Формат: "Таблица. Заголовок1: значение1. Заголовок2: значение2."
+             */
+            const lines = tableText.trim().split('\n').filter(line => line.trim());
+            if (lines.length < 2) return tableText;
+            
+            // Первая строка - заголовки
+            const headerCells = lines[0].split('|').map(h => h.trim());
+            const headers = headerCells.filter((h, idx) => idx > 0 && idx < headerCells.length - 1);
+            
+            if (headers.length === 0) return tableText;
+            
+            // Остальные строки - данные (пропускаем разделитель)
+            const rows = [];
+            for (let i = 2; i < lines.length; i++) {
+                const cells = lines[i].split('|').map(c => c.trim());
+                const rowData = cells.filter((cell, idx) => idx > 0 && idx < cells.length - 1);
+                rows.push(rowData.slice(0, headers.length));
+            }
+            
+            let text = 'Таблица. ';
+            rows.forEach((row, rowIdx) => {
+                if (rowIdx > 0) text += ' Следующая строка. ';
+                headers.forEach((header, idx) => {
+                    const cell = (row[idx] !== undefined && row[idx] !== null && row[idx] !== '') ? row[idx] : '';
+                    if (cell) {
+                        text += `${header}: ${cell}. `;
+                    }
+                });
+            });
+            
+            return text.trim();
+        }
+        
+        function convertTextToHtml(text) {
+            // Примечание: сначала обрабатываем специальные блоки, сохраняя их для обработки
+            let html = text;
+            
+            // Удаляем специальные токены LLM <|begin_of_box|>...<|end_of_box|>
+            // Примечание: извлекаем содержимое, убирая только теги
+            html = html.replace(/<\|begin_of_box\|>([\s\S]*?)<\|end_of_box\|>/g, '$1');
+            
+            // Удаляем специальные токены LLM вида <|token_name|>content
+            // Примечание: если есть <|message|>, оставляем только текст после него
+            const messageMatch = html.match(/<\|message\|>([\s\S]*)/);
+            if (messageMatch) {
+                html = messageMatch[1];
+            } else {
+                // Удаляем все токены и их содержимое
+                html = html.replace(/<\|[^|]+\|>[^<]*?(?=<\||$)/g, '');
+                html = html.replace(/<\|[^|]+\|>/g, '');
+            }
+            
+            // Экранируем HTML в блоках кода и размышлений, но сохраняем их для обработки
+            const thinkBlocks = [];
+            const codeBlocks = [];
+            const inlineCodeBlocks = [];
+            const tableBlocks = [];
+            const mathBlocks = [];
+            const quoteBlocks = [];
+            
+            // Обрабатываем блоки размышлений <think>...</think>
+            // Примечание: преобразуем в сворачиваемую секцию "Размышления"
+            html = html.replace(/<think>([\s\S]*?)<\/think>/gi, (match, content) => {
+                const placeholder = `__THINK_BLOCK_${thinkBlocks.length}__`;
+                // Экранируем HTML внутри размышлений
+                const escapedContent = content
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\n/g, '<br>');
+                thinkBlocks.push(`<details class="think-block"><summary><i class="bi bi-lightbulb me-1"></i>Размышления</summary><div class="think-content">${escapedContent}</div></details>`);
+                return placeholder;
+            });
+            
+            // Обрабатываем многострочные блоки кода ```язык\nкод\n```
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+                // Экранируем HTML внутри кода
+                const escapedCode = code
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
+                const langClass = lang ? ` class="language-${lang}"` : '';
+                codeBlocks.push(`<pre${langClass}><code>${escapedCode}</code></pre>`);
+                return placeholder;
+            });
+            
+            // Обрабатываем инлайн код `код`
+            html = html.replace(/`([^`]+)`/g, (match, code) => {
+                const escapedCode = code
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                const placeholder = `__INLINE_CODE_${inlineCodeBlocks.length}__`;
+                inlineCodeBlocks.push(`<code>${escapedCode}</code>`);
+                return placeholder;
+            });
+            
+            // Обрабатываем Markdown таблицы (| Заголовок | Заголовок |\n| :--- | :--- |\n| Ячейка | Ячейка |)
+            // Примечание: таблица должна начинаться с | и содержать разделитель с :--- или ---
+            // Улучшенное регулярное выражение для обработки таблиц с пустыми ячейками
+            html = html.replace(/(\|[^\n]*\|\s*\n\|[\s:\-|]+\|\s*\n(?:\|[^\n]*\|\s*\n?)+)/g, (match, tableText) => {
+                const placeholder = `__TABLE_BLOCK_${tableBlocks.length}__`;
+                const tableHtml = convertTableToHtml(tableText);
+                tableBlocks.push(tableHtml);
+                return placeholder;
+            });
+            
+            // Удаляем одиночные символы | в начале строк (могут появляться из-за неправильной обработки)
+            // Примечание: удаляем только если | стоит один в начале строки
+            // Это нужно делать после обработки таблиц, но до экранирования HTML
+            html = html.replace(/^\| /gm, '');
+            html = html.replace(/^\|$/gm, '');
+            // Также удаляем | в начале строки без пробела (если остались после обработки таблиц)
+            html = html.replace(/^\|/gm, '');
+            
+            // Обрабатываем LaTeX формулы \(...\) и \[...\]
+            // Примечание: сохраняем формулы до экранирования HTML
+            html = html.replace(/\\\(([^)]+)\\\)/g, (match, formula) => {
+                const placeholder = `__MATH_INLINE_${mathBlocks.length}__`;
+                mathBlocks.push({type: 'inline', formula: formula});
+                return placeholder;
+            });
+            html = html.replace(/\\\[([^\]]+)\\\]/g, (match, formula) => {
+                const placeholder = `__MATH_BLOCK_${mathBlocks.length}__`;
+                mathBlocks.push({type: 'block', formula: formula});
+                return placeholder;
+            });
+            
+            // Обрабатываем блоки цитат (> в начале строки)
+            // Примечание: обрабатываем многострочные цитаты
+            html = html.replace(/^> (.+)$/gm, (match, content) => {
+                const placeholder = `__QUOTE_BLOCK_${quoteBlocks.length}__`;
+                quoteBlocks.push(content);
+                return placeholder;
+            });
+            
+            // Обрабатываем жирный текст **text** ДО экранирования HTML
+            // Примечание: важно обработать до экранирования, чтобы астериски не были экранированы
+            // Используем нежадный квантификатор для правильной обработки
+            html = html.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+            
+            // Обрабатываем курсив *text* ДО экранирования HTML (но не если это часть списка)
+            // Примечание: избегаем конфликта с маркерами списков и жирным текстом
+            // Обрабатываем только одиночные астериски, которые не являются частью **
+            // Исключаем случаи, когда * стоит в начале строки (это маркер списка)
+            html = html.replace(/(?<!^[\-\*] )(?<!\*)\*([^*\n]+?)\*(?!\*)/gm, '<em>$1</em>');
+            
+            // Обрабатываем заголовки Markdown ДО экранирования HTML
+            // Примечание: обрабатываем от большего количества # к меньшему для правильного порядка
+            // #### -> h6, ### -> h5, ## -> h4, # -> h3
+            html = html.replace(/^#### (.+)$/gm, '<h6 class="md-heading">$1</h6>');
+            html = html.replace(/^### (.+)$/gm, '<h5 class="md-heading">$1</h5>');
+            html = html.replace(/^## (.+)$/gm, '<h4 class="md-heading">$1</h4>');
+            html = html.replace(/^# (.+)$/gm, '<h3 class="md-heading">$1</h3>');
+            
+            // Обрабатываем нумерованные списки Markdown ДО экранирования HTML
+            // Примечание: обрабатываем до замены \n на <br>
+            html = html.replace(/^(\d+)\. (.+)$/gm, '<li class="md-list-item md-list-ordered">$2</li>');
+            
+            // Обрабатываем списки Markdown (- или * в начале строки) ДО экранирования HTML
+            // Примечание: обрабатываем до замены \n на <br>, избегаем конфликта с курсивом
+            // Обрабатываем только если это начало строки (после переноса строки или начала текста)
+            html = html.replace(/^[\-\*] (.+)$/gm, '<li class="md-list-item">$1</li>');
+            
+            // Нормализуем пробелы и переносы строк перед экранированием
+            // Примечание: убираем множественные пробелы и переносы, но сохраняем структуру
+            // Важно: НЕ трогаем плейсхолдеры формул (они содержат только буквы, цифры и подчеркивания)
+            html = html
+                .replace(/[ \t]+/g, ' ')  // Множественные пробелы/табы в один пробел
+                .replace(/\n{3,}/g, '\n\n')  // Множественные переносы строк в два
+                .replace(/\n{2,}/g, '\n\n')  // Убираем более двух переносов подряд
+                .replace(/[ \t]+\n/g, '\n')  // Пробелы перед переносами строк
+                .replace(/\n[ \t]+/g, '\n')  // Пробелы после переносов строк
+                .replace(/[ \t]+$/gm, '')  // Пробелы в конце строк
+                .replace(/^\n+/gm, '')  // Убираем переносы в начале строк
+                .replace(/\n+$/gm, '');  // Убираем переносы в конце строк
+            
+            // Экранируем HTML в остальном тексте (после обработки Markdown форматирования)
+            // Примечание: НЕ экранируем уже созданные HTML-теги и плейсхолдеры формул
+            // Сначала защищаем уже созданные HTML-теги от экранирования
+            const htmlTagPlaceholders = [];
+            // Защищаем парные теги (strong, em, h1-h6, ul, ol, li, blockquote, code, pre, span, div и т.д.)
+            html = html.replace(/<(strong|em|h[1-6]|ul|ol|li|blockquote|code|pre|span|div|table|thead|tbody|tr|th|td|p)[^>]*>.*?<\/\1>/gs, (match) => {
+                const placeholder = `__HTML_TAG_${htmlTagPlaceholders.length}__`;
+                htmlTagPlaceholders.push(match);
+                return placeholder;
+            });
+            // Также защищаем самозакрывающиеся теги
+            html = html.replace(/<(br|hr|img|input|meta|link)[^>]*\/?>/gi, (match) => {
+                const placeholder = `__HTML_TAG_${htmlTagPlaceholders.length}__`;
+                htmlTagPlaceholders.push(match);
+                return placeholder;
+            });
+            
+            // Теперь экранируем HTML в остальном тексте
+            // Примечание: экранируем только те символы, которые не являются частью защищенных тегов
+            // Важно: экранируем только вне защищенных плейсхолдеров
+            html = html
+                .replace(/&(?!amp;|lt;|gt;|quot;|#|__HTML_TAG_)/g, '&amp;')  // Экранируем &, но не уже экранированные
+                .replace(/<(?!__HTML_TAG_)/g, '&lt;')  // Экранируем <, но не в плейсхолдерах
+                .replace(/(?<!__HTML_TAG_\d+__)>/g, '&gt;');  // Экранируем >, но не в плейсхолдерах
+            
+            // Восстанавливаем защищенные HTML-теги
+            htmlTagPlaceholders.forEach((tag, i) => {
+                html = html.replace(`__HTML_TAG_${i}__`, tag);
+            });
+            
+            // Удаляем одиночные символы | в начале строк (могут появляться из-за неправильной обработки)
+            // Примечание: удаляем только если | стоит один в начале строки
+            // Это нужно делать после обработки таблиц, но до экранирования HTML
+            html = html.replace(/^\| /gm, '');
+            html = html.replace(/^\|$/gm, '');
+            // Также удаляем | в начале строки без пробела (если остались после обработки таблиц)
+            html = html.replace(/^\|/gm, '');
+            
+            // Горизонтальная линия Markdown (--- или *** или ___) - УБИРАЕМ ИХ ПОЛНОСТЬЮ
+            // Примечание: пользователь просил убрать горизонтальные линии
+            html = html.replace(/\n*^[-*_]{3,}$\n*/gm, '');
+            
+            // Переносы строк (только вне блоков кода)
+            // Примечание: заменяем переносы на <br>, но сохраняем структуру
+            // Важно: делаем это ПОСЛЕ обработки списков, но ДО восстановления формул
+            html = html.replace(/\n/g, '<br>');
+            
+            // Убираем лишние <br> теги (более 2 подряд) и пробелы вокруг них
+            // Примечание: делаем это ДО восстановления формул, чтобы не повлиять на плейсхолдеры
+            html = html.replace(/(<br>\s*){3,}/g, '<br><br>');
+            // Убираем более двух <br> подряд (оставляем максимум два)
+            html = html.replace(/(<br>\s*){2,}/g, '<br><br>');
+            // Убираем пробелы вокруг одиночных <br>
+            html = html.replace(/\s+<br>\s+/g, '<br>');
+            html = html.replace(/^\s*<br>\s*/gm, '<br>');
+            html = html.replace(/\s*<br>\s*$/gm, '<br>');
+            // Убираем пробелы между <br> и плейсхолдерами формул
+            html = html.replace(/<br>\s*(__MATH_(?:INLINE|BLOCK)_\d+__)/g, '<br>$1');
+            html = html.replace(/(__MATH_(?:INLINE|BLOCK)_\d+__)\s*<br>/g, '$1<br>');
+            
+            // Группируем элементы списка в <ul> или <ol>
+            // Примечание: обрабатываем последовательные <li> элементы, разделенные <br>
+            // Сначала обрабатываем нумерованные списки
+            html = html.replace(/(<li class="md-list-item md-list-ordered">[^<]*<\/li>(?:<br>?<li class="md-list-item md-list-ordered">[^<]*<\/li>)*)/g, (match) => {
+                return `<ol class="md-list">${match.replace(/<br>?/g, '')}</ol>`;
+            });
+            
+            // Затем обрабатываем маркированные списки
+            html = html.replace(/(<li class="md-list-item">[^<]*<\/li>(?:<br>?<li class="md-list-item">[^<]*<\/li>)*)/g, (match) => {
+                return `<ul class="md-list">${match.replace(/<br>?/g, '')}</ul>`;
+            });
+            
+            // Восстанавливаем инлайн код
+            inlineCodeBlocks.forEach((block, i) => {
+                html = html.replace(`__INLINE_CODE_${i}__`, block);
+            });
+            
+            // Восстанавливаем блоки кода
+            codeBlocks.forEach((block, i) => {
+                html = html.replace(`__CODE_BLOCK_${i}__`, block);
+            });
+            
+            // Восстанавливаем блоки размышлений
+            thinkBlocks.forEach((block, i) => {
+                html = html.replace(`__THINK_BLOCK_${i}__`, block);
+            });
+            
+            // Восстанавливаем таблицы
+            tableBlocks.forEach((block, i) => {
+                html = html.replace(`__TABLE_BLOCK_${i}__`, block);
+            });
+            
+            // Восстанавливаем математические формулы
+            // Примечание: важно восстанавливать ДО других операций, которые могут повлиять на плейсхолдеры
+            mathBlocks.forEach((block, i) => {
+                // Формула была сохранена до экранирования, поэтому экранируем только HTML символы
+                const escapedFormula = block.formula
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                
+                // Используем глобальную замену для всех вхождений плейсхолдера
+                const inlinePattern = new RegExp(`__MATH_INLINE_${i}__`, 'g');
+                const blockPattern = new RegExp(`__MATH_BLOCK_${i}__`, 'g');
+                
+                if (block.type === 'inline') {
+                    html = html.replace(inlinePattern, `<span class="math-inline">\\(${escapedFormula}\\)</span>`);
+                } else {
+                    html = html.replace(blockPattern, `<div class="math-block">\\[${escapedFormula}\\]</div>`);
+                }
+            });
+            
+            // Восстанавливаем блоки цитат
+            quoteBlocks.forEach((content, i) => {
+                // Контент уже экранирован, просто оборачиваем в blockquote
+                html = html.replace(`__QUOTE_BLOCK_${i}__`, `<blockquote class="md-quote">${content}</blockquote>`);
+            });
+            
+            // Перерисовываем MathJax формулы после обновления контента
+            if (window.MathJax && mathBlocks.length > 0) {
+                // Используем setTimeout для асинхронной перерисовки
+                setTimeout(() => {
+                    if (window.MathJax.typesetPromise) {
+                        window.MathJax.typesetPromise();
+                    } else if (window.MathJax.Hub) {
+                        window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub]);
+                    }
+                }, 100);
+            }
+            
+            return html;
+        }
+        
+        async function sendChatMessage() {
+            const text = dom.chatInput.value.trim();
+            if (!text) return;
+            
+            const speaker = getChatSpeaker();
+            const systemPrompt = getCurrentRolePrompt();
+            const maxTokens = getCurrentRoleMaxTokens();
+            dom.chatInput.value = '';
+            appendChatMessage(text, 'user');
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: text,
+                        context: chatHistory.slice(-12).map(m => `${m.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${m.text}`).join('\n'),
+                        speaker: speaker,
+                        system_prompt: systemPrompt,
+                        max_tokens: maxTokens
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    let audioBase64 = null;
+                    try {
+                        const ttsResponse = await fetch('/api/tts/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: data.response, speaker: speaker })
+                        });
+                        
+                        if (ttsResponse.ok) {
+                            const ttsData = await ttsResponse.json();
+                            if (ttsData.success) {
+                                audioBase64 = ttsData.audio_base64;
+                            }
+                        }
+                    } catch (ttsError) {
+                        console.warn('TTS недоступен:', ttsError);
+                    }
+                    
+                    appendChatMessage(data.response, 'assistant', audioBase64);
+                } else {
+                    appendChatMessage('Ошибка: не удалось получить ответ', 'assistant');
+                }
+            } catch (e) {
+                appendChatMessage('Ошибка соединения с сервером', 'assistant');
+                console.error(e);
+            }
+        }
+        
+        function clearChat() {
+            chatHistory = [];
+            dom.chatMessages.innerHTML = '';
+            dom.emptyChatState.style.display = 'flex';
+            dom.chatMessages.appendChild(dom.emptyChatState);
+        }
+        
+        // ========== Транскрипция: Микрофон ==========
+        async function startTranscriptRecording() {
+            try {
+                transcriptMediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 8000 },
+                    video: false
+                });
+                
+                transcriptAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
+                const input = transcriptAudioCtx.createMediaStreamSource(transcriptMediaStream);
+                transcriptProcessor = (transcriptAudioCtx.createScriptProcessor || transcriptAudioCtx.createJavaScriptNode).call(transcriptAudioCtx, 1024, 1, 1);
+                
+                input.connect(transcriptProcessor);
+                transcriptProcessor.connect(transcriptAudioCtx.destination);
+                
+                // WebSocket для транскрипции (без LLM)
+                const wsUrl = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/ws`;
+                transcriptWs = new WebSocket(wsUrl);
+                transcriptWs.binaryType = 'arraybuffer';
+                
+                transcriptWs.onmessage = (ev) => {
+                    try {
+                        const msg = JSON.parse(ev.data);
+                        if (msg.event === 'transcript') {
+                            appendTranscript(msg.phrase);
+                        }
+                    } catch (e) {
+                        console.error('Ошибка парсинга:', e);
+                    }
+                };
+                
+                let buffer8k = [];
+                transcriptProcessor.onaudioprocess = (ev) => {
+                    const data = ev.inputBuffer.getChannelData(0);
+                    buffer8k.push(...data);
+                    updateWaveformData(data);
+                    
+                    while (buffer8k.length >= CHUNK_SAMPLES) {
+                        const chunk = buffer8k.slice(0, CHUNK_SAMPLES);
+                        buffer8k = buffer8k.slice(CHUNK_SAMPLES);
+                        const pcm16 = floatToPCM16(chunk);
+                        
+                        if (transcriptWs && transcriptWs.readyState === WebSocket.OPEN) {
+                            transcriptWs.send(new Uint8Array(pcm16.buffer));
+                        }
+                    }
+                };
+                
+                drawWaveform();
+                transcriptTimerInterval = startTimer(dom.transcriptTimerDisplay);
+                
+                dom.startRecBtn.disabled = true;
+                dom.stopRecBtn.disabled = false;
+                
+            } catch (e) {
+                alert('Не удалось получить доступ к микрофону: ' + e.message);
+                console.error(e);
+            }
+        }
+        
+        function stopTranscriptRecording() {
+            if (transcriptProcessor) {
+                transcriptProcessor.disconnect();
+                transcriptProcessor.onaudioprocess = null;
+                transcriptProcessor = null;
+            }
+            
+            if (transcriptAudioCtx) {
+                transcriptAudioCtx.close();
+                transcriptAudioCtx = null;
+            }
+            
+            if (transcriptMediaStream) {
+                transcriptMediaStream.getTracks().forEach(t => t.stop());
+                transcriptMediaStream = null;
+            }
+            
+            if (transcriptWs && transcriptWs.readyState === WebSocket.OPEN) {
+                transcriptWs.send(new Uint8Array());
+            }
+            
+            stopWaveform();
+            stopTimer(transcriptTimerInterval, dom.transcriptTimerDisplay);
+            transcriptTimerInterval = null;
+            
+            dom.startRecBtn.disabled = false;
+            dom.stopRecBtn.disabled = true;
+        }
+        
+        // ========== Транскрипция: Результаты ==========
+        function appendTranscript(phrase) {
+            transcripts.push(phrase);
+            dom.emptyTranscriptState.style.display = 'none';
+            
+            const li = document.createElement('li');
+            li.className = 'd-flex justify-content-between align-items-start';
+            li.innerHTML = `
+                <div class="me-auto">${phrase.text}</div>
+                <span class="badge bg-secondary rounded-pill ms-2">${phrase.start_time.toFixed(1)}s</span>
+            `;
+            dom.transcriptList.appendChild(li);
+            li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        function clearTranscripts() {
+            transcripts = [];
+            dom.transcriptList.innerHTML = '';
+            dom.emptyTranscriptState.style.display = 'flex';
+        }
+        
+        function copyTranscripts() {
+            const text = transcripts.map(t => t.text).join('\n');
+            if (!text) {
+                alert('Нет данных для копирования');
+                return;
+            }
+            
+            navigator.clipboard.writeText(text).then(() => {
+                dom.copyBtn.innerHTML = '<i class="bi bi-check-lg"></i>';
+                setTimeout(() => {
+                    dom.copyBtn.innerHTML = '<i class="bi bi-clipboard"></i>';
+                }, 1500);
+            }).catch(e => {
+                alert('Не удалось скопировать: ' + e.message);
+            });
+        }
+        
+        // ========== Транскрипция: Файл ==========
+        async function processAudioFile() {
+            const file = dom.audioFile.files[0];
+            if (!file) return;
+            
+            dom.processBtn.disabled = true;
+            dom.progressBox.style.display = 'block';
+            dom.progressBar.style.width = '50%';
+            dom.progressBar.textContent = 'Обработка...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    dom.progressBar.style.width = '100%';
+                    dom.progressBar.textContent = '100%';
+                    
+                    for (const phrase of data.phrases) {
+                        appendTranscript(phrase);
+                    }
+                } else {
+                    throw new Error('Ошибка сервера');
+                }
+            } catch (e) {
+                alert('Ошибка обработки файла: ' + e.message);
+                console.error(e);
+            } finally {
+                dom.processBtn.disabled = false;
+                setTimeout(() => {
+                    dom.progressBox.style.display = 'none';
+                }, 1000);
+            }
+        }
+        
+        // ========== Обработчики событий ==========
+        // Модели LLM
+        dom.modelSelect.addEventListener('change', (e) => {
+            changeModel(e.target.value);
+        });
+        
+        // Настройки LLM
+        dom.saveLlmSettingsBtn.addEventListener('click', saveLlmSettings);
+        dom.toggleApiKeyBtn.addEventListener('click', toggleApiKeyVisibility);
+        document.getElementById('llmSettingsModal').addEventListener('show.bs.modal', loadLlmSettings);
+        
+        // Роли
+        dom.roleSelect.addEventListener('change', (e) => {
+            currentRoleId = e.target.value;
+            saveSelectedRole();
+            updateCurrentRoleBadge();
+        });
+        
+        dom.addRoleBtn.addEventListener('click', addNewRole);
+        dom.saveRoleBtn.addEventListener('click', saveEditedRole);
+        
+        // Обновление таблицы ролей при открытии модального окна
+        document.getElementById('rolesModal').addEventListener('show.bs.modal', renderRolesTable);
+        
+        // Чат
+        dom.startChatBtn.addEventListener('click', startChatRecording);
+        dom.stopChatBtn.addEventListener('click', stopChatRecording);
+        dom.sendChatBtn.addEventListener('click', sendChatMessage);
+        dom.clearChatBtn.addEventListener('click', clearChat);
+        
+        // Обработчик кнопки "Стоп" для остановки генерации ответа
+        dom.stopGenerationBtn.addEventListener('click', async function() {
+            try {
+                // Отправляем команду остановки через HTTP endpoint
+                const response = await fetch('/api/chat/stop', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                if (response.ok) {
+                    console.log('Команда остановки генерации отправлена');
+                } else {
+                    console.error('Ошибка при отправке команды остановки');
+                }
+            } catch (error) {
+                console.error('Ошибка при отправке команды остановки:', error);
+            }
+        });
+        dom.chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+        
+        // Транскрипция
+        dom.startRecBtn.addEventListener('click', startTranscriptRecording);
+        dom.stopRecBtn.addEventListener('click', stopTranscriptRecording);
+        dom.processBtn.addEventListener('click', processAudioFile);
+        dom.copyBtn.addEventListener('click', copyTranscripts);
+        dom.clearTranscriptBtn.addEventListener('click', clearTranscripts);
+        
+        dom.audioFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                dom.audioPlayerBox.style.display = 'block';
+                dom.audioPlayer.src = URL.createObjectURL(file);
+                dom.processBtn.disabled = false;
+            }
+        });
+        
+        // Переключение темы
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+        
+        // Инициализация
+        init();
+    </script>
+</body>
+</html>

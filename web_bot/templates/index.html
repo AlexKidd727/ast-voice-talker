@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AST-VoiceTalker - Голосовой Веб-бот</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 800px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f9f9f9;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.bot {
+            background: #e0e0e0;
+            color: #333;
+            margin-right: auto;
+        }
+
+        .message.system {
+            background: #fff3cd;
+            color: #856404;
+            margin: 0 auto;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-group {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+
+        .text-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .text-input:focus {
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+        }
+
+        .recording {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .file-upload {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-upload input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .upload-label {
+            display: inline-block;
+            padding: 12px 20px;
+            background: #28a745;
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-label:hover {
+            background: #218838;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+                height: 100vh;
+                border-radius: 0;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .input-group {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 AST-VoiceTalker</h1>
+            <p>Голосовой веб-бот для общения </p>
+        </div>
+        
+        <div class="chat-container">
+            <div class="status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="statusText">Подключение...</span>
+            </div>
+            
+            <div class="messages" id="messages">
+                <div class="message system">
+                    Добро пожаловать! Вы можете общаться голосом или текстом.
+                </div>
+            </div>
+            
+            <div class="controls">
+                <div class="input-group">
+                    <input type="text" class="text-input" id="textInput" placeholder="Введите сообщение или используйте голос..." disabled>
+                    <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" disabled>Отправить</button>
+                </div>
+                
+                <button class="btn btn-secondary" id="voiceBtn" onclick="toggleRecording()">
+                    🎤 Голос
+                </button>
+                
+                <div class="file-upload">
+                    <input type="file" id="audioFile" accept="audio/*" onchange="uploadAudio()">
+                    <label for="audioFile" class="upload-label">📁 Файл</label>
+                </div>
+                
+                <button class="btn btn-danger" onclick="clearChat()">Очистить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class VoiceTalkerBot {
+            constructor() {
+                this.ws = null;
+                this.clientId = this.generateClientId();
+                this.isRecording = false;
+                this.mediaRecorder = null;
+                this.audioChunks = [];
+                this.isConnected = false;
+                
+                this.initializeElements();
+                this.connect();
+            }
+            
+            generateClientId() {
+                return 'client_' + Math.random().toString(36).substr(2, 9);
+            }
+            
+            initializeElements() {
+                this.statusIndicator = document.getElementById('statusIndicator');
+                this.statusText = document.getElementById('statusText');
+                this.messages = document.getElementById('messages');
+                this.textInput = document.getElementById('textInput');
+                this.sendBtn = document.getElementById('sendBtn');
+                this.voiceBtn = document.getElementById('voiceBtn');
+            }
+            
+            connect() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/${this.clientId}`;
+                
+                this.ws = new WebSocket(wsUrl);
+                
+                this.ws.onopen = () => {
+                    this.isConnected = true;
+                    this.updateStatus('Подключено', true);
+                    this.textInput.disabled = false;
+                    this.sendBtn.disabled = false;
+                    this.addMessage('Система', 'Подключение установлено', 'system');
+                };
+                
+                this.ws.onmessage = (event) => {
+                    this.addMessage('Бот', event.data, 'bot');
+                };
+                
+                this.ws.onclose = () => {
+                    this.isConnected = false;
+                    this.updateStatus('Отключено', false);
+                    this.textInput.disabled = true;
+                    this.sendBtn.disabled = true;
+                    this.addMessage('Система', 'Соединение потеряно', 'system');
+                    
+                    // Попытка переподключения через 3 секунды
+                    setTimeout(() => this.connect(), 3000);
+                };
+                
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    this.addMessage('Система', 'Ошибка соединения', 'system');
+                };
+            }
+            
+            updateStatus(text, connected) {
+                this.statusText.textContent = text;
+                this.statusIndicator.className = `status-indicator ${connected ? 'connected' : ''}`;
+            }
+            
+            addMessage(sender, text, type = 'user') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${type}`;
+                messageDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+                this.messages.appendChild(messageDiv);
+                this.messages.scrollTop = this.messages.scrollHeight;
+            }
+            
+            sendMessage() {
+                const message = this.textInput.value.trim();
+                if (message && this.isConnected) {
+                    this.ws.send(message);
+                    this.addMessage('Вы', message, 'user');
+                    this.textInput.value = '';
+                }
+            }
+            
+            async toggleRecording() {
+                if (!this.isRecording) {
+                    await this.startRecording();
+                } else {
+                    this.stopRecording();
+                }
+            }
+            
+            async startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    this.mediaRecorder = new MediaRecorder(stream);
+                    this.audioChunks = [];
+                    
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        this.audioChunks.push(event.data);
+                    };
+                    
+                    this.mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                        this.sendAudio(audioBlob);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    this.voiceBtn.textContent = '⏹️ Стоп';
+                    this.voiceBtn.classList.add('recording');
+                    this.addMessage('Система', 'Запись начата...', 'system');
+                    
+                } catch (error) {
+                    console.error('Ошибка доступа к микрофону:', error);
+                    this.addMessage('Система', 'Ошибка доступа к микрофону', 'system');
+                }
+            }
+            
+            stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    this.voiceBtn.textContent = '🎤 Голос';
+                    this.voiceBtn.classList.remove('recording');
+                    this.addMessage('Система', 'Запись завершена', 'system');
+                }
+            }
+            
+            sendAudio(audioBlob) {
+                if (this.isConnected) {
+                    this.ws.send(audioBlob);
+                    this.addMessage('Вы', '[Голосовое сообщение]', 'user');
+                }
+            }
+            
+            async uploadAudio() {
+                const fileInput = document.getElementById('audioFile');
+                const file = fileInput.files[0];
+                
+                if (!file) return;
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('client_id', this.clientId);
+                
+                try {
+                    this.addMessage('Система', 'Обработка аудиофайла...', 'system');
+                    
+                    const response = await fetch('/upload_audio', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        this.addMessage('Вы', '[Аудиофайл]', 'user');
+                        this.addMessage('Бот', result.transcription, 'bot');
+                        if (result.response) {
+                            this.addMessage('Бот', result.response, 'bot');
+                        }
+                    } else {
+                        this.addMessage('Система', 'Ошибка обработки файла', 'system');
+                    }
+                    
+                } catch (error) {
+                    console.error('Ошибка загрузки файла:', error);
+                    this.addMessage('Система', 'Ошибка загрузки файла', 'system');
+                }
+                
+                fileInput.value = '';
+            }
+            
+            clearChat() {
+                this.messages.innerHTML = '<div class="message system">Чат очищен</div>';
+            }
+        }
+        
+        // Глобальные функции
+        let bot;
+        
+        function sendMessage() {
+            bot.sendMessage();
+        }
+        
+        function toggleRecording() {
+            bot.toggleRecording();
+        }
+        
+        function uploadAudio() {
+            bot.uploadAudio();
+        }
+        
+        function clearChat() {
+            bot.clearChat();
+        }
+        
+        // Обработка Enter в поле ввода
+        document.addEventListener('DOMContentLoaded', () => {
+            bot = new VoiceTalkerBot();
+            
+            document.getElementById('textInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
